@@ -1,8 +1,15 @@
-group: io.kestra.plugin.template
-name: "template"
-title: "Template"
-description: "Plugin template for Kestra"
-body: ""
+group: io.kestra.plugin.argocd
+name: "argocd"
+title: "Argo CD"
+description: >
+  Kestra plugin to interact with Argo CD using the Argo CD CLI.
+  Tasks are executed inside a container and rely on the official Argo CD CLI
+  to perform application synchronization and status inspection.
+body: >
+  This plugin provides core Argo CD tasks such as application synchronization
+  and status retrieval.  
+  All operations are executed in a container-based environment using the
+  `curlimages/curl` image, with the Argo CD CLI installed at runtime.
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

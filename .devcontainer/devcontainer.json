@@ -1,10 +1,10 @@
 {
-  "name": "plugin-template",
+  "name": "plugin-argocd",
   "build": {
     "context": ".",
     "dockerfile": "Dockerfile"
   },
-  "workspaceFolder": "/workspaces/plugin-template",
+  "workspaceFolder": "/workspaces/plugin-argocd",
   "forwardPorts": [8080],
   "customizations": {
     "vscode": {

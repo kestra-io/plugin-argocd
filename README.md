@@ -36,11 +36,7 @@
 <p align="center" style="color:grey;"><i>Get started with Kestra in 3 minutes.</i></p>
 
 
-# Kestra Plugin Template
-
-> A template for creating Kestra plugins
-
-This repository serves as a general template for creating a new [Kestra](https://github.com/kestra-io/kestra) plugin. It should take only a few minutes! Use this repository as a scaffold to ensure that you've set up the plugin correctly, including unit tests and CI/CD workflows.
+# Kestra ArgoCD Plugin
 
 ![Kestra orchestrator](https://kestra.io/video.gif)
 
