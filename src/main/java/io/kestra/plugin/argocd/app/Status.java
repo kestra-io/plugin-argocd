@@ -109,7 +109,8 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
         StringBuilder getCmd = new StringBuilder();
         getCmd.append("/tmp/argocd app get ").append(rApplication);
 
-        if (Boolean.TRUE.equals(this.refresh)) {
+        boolean rRefresh = runContext.render(this.refresh).as(Boolean.class).orElse(false);
+        if (rRefresh) {
             getCmd.append(" --refresh");
         }
 

@@ -73,20 +73,23 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
             syncCmd.append(" --revision ").append(rRevision);
         }
 
-        if (Boolean.TRUE.equals(this.prune)) {
+        if (runContext.render(this.prune).as(Boolean.class).orElse(false)) {
             syncCmd.append(" --prune");
         }
 
-        if (Boolean.TRUE.equals(this.dryRun)) {
+        if (runContext.render(this.dryRun).as(Boolean.class).orElse(false)) {
             syncCmd.append(" --dry-run");
         }
 
-        if (Boolean.TRUE.equals(this.force)) {
+        if (runContext.render(this.force).as(Boolean.class).orElse(false)) {
             syncCmd.append(" --force");
         }
 
         if (this.timeout != null) {
-            syncCmd.append(" --timeout ").append(this.timeout);
+            Duration rTimeout = runContext.render(this.timeout).as(Duration.class).orElse(null);
+            if (rTimeout != null) {
+                syncCmd.append(" --timeout ").append(rTimeout.getSeconds());
+            }
         }
 
         syncCmd.append(" --output json");

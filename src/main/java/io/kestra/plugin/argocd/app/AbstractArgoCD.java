@@ -7,7 +7,6 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.ScriptService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
-import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
@@ -60,8 +59,8 @@ public abstract class AbstractArgoCD extends Task {
     Property<Boolean> insecure = Property.ofValue(true);
 
     @Schema(
-        title = "Task runner to use.",
-        description = "The task runner to use for executing the ArgoCD commands. By default, uses Docker with the curlimages/curl image."
+        title = "Task runner.",
+        description = "The task runner used to execute the ArgoCD CLI commands inside a container."
     )
     @Builder.Default
     @PluginProperty
@@ -72,7 +71,7 @@ public abstract class AbstractArgoCD extends Task {
 
     @Schema(
         title = "Container image.",
-        description = "The container image to use for the task. Defaults to curlimages/curl:latest."
+        description = "The container image to use. Defaults to curlimages/curl:latest; the ArgoCD CLI is installed at runtime."
     )
     @Builder.Default
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
@@ -84,24 +83,30 @@ public abstract class AbstractArgoCD extends Task {
     @PluginProperty(dynamic = true)
     protected Map<String, String> env;
 
-    protected List<String> getInstallCommands(RunContext runContext) throws IllegalVariableEvaluationException {
-        List<String> commands = new ArrayList<>();
-
-        commands.add("curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64");
-        commands.add("chmod +x /tmp/argocd");
-
-        return commands;
+    protected List<String> getInstallCommands() {
+        return List.of(
+            "curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64",
+            "chmod +x /tmp/argocd"
+        );
     }
 
     protected String getLoginCommand(RunContext runContext) throws IllegalVariableEvaluationException {
         String rServer = runContext.render(this.server).as(String.class).orElseThrow();
         String rToken = runContext.render(this.token).as(String.class).orElseThrow();
 
+        // ArgoCD CLI expects host:port, not a full URL
+        if (rServer.startsWith("https://")) {
+            rServer = rServer.substring("https://".length());
+        } else if (rServer.startsWith("http://")) {
+            rServer = rServer.substring("http://".length());
+        }
+
         StringBuilder cmd = new StringBuilder();
         cmd.append("/tmp/argocd login ").append(rServer);
         cmd.append(" --auth-token ").append(rToken);
 
-        if (Boolean.TRUE.equals(this.insecure)) {
+        boolean rInsecure = runContext.render(this.insecure).as(Boolean.class).orElse(true);
+        if (rInsecure) {
             cmd.append(" --insecure");
         }
 
@@ -127,25 +132,22 @@ public abstract class AbstractArgoCD extends Task {
     protected ScriptOutput executeCommands(RunContext runContext, List<String> commands, List<String> outputFiles) throws Exception {
         List<String> allCommands = new ArrayList<>();
 
-        allCommands.addAll(getInstallCommands(runContext));
-
+        allCommands.addAll(getInstallCommands());
         allCommands.add(getLoginCommand(runContext));
-
         allCommands.addAll(commands);
 
         String renderedContainerImage = runContext.render(this.containerImage).as(String.class).orElseThrow();
 
         CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
-            .withRunnerType(RunnerType.DOCKER)
             .withTaskRunner(this.taskRunner)
             .withContainerImage(renderedContainerImage)
             .withEnv(this.getEnvironmentVariables(runContext))
             .withCommands(
-                (Property<List<String>>) ScriptService.scriptCommands(
+                Property.ofValue(ScriptService.scriptCommands(
                     List.of("/bin/sh", "-c"),
                     null,
                     allCommands
-                )
+                ))
             );
 
         if (outputFiles != null && !outputFiles.isEmpty()) {
