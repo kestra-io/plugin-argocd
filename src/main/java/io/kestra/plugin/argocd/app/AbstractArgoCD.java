@@ -141,7 +141,7 @@ public abstract class AbstractArgoCD extends Task {
             .withContainerImage(renderedContainerImage)
             .withEnv(this.getEnvironmentVariables(runContext))
             .withCommands(
-                ScriptService.scriptCommands(
+                (Property<List<String>>) ScriptService.scriptCommands(
                     List.of("/bin/sh", "-c"),
                     null,
                     allCommands
