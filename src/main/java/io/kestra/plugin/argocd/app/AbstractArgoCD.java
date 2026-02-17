@@ -32,7 +32,7 @@ public abstract class AbstractArgoCD extends Task {
     private static final String DEFAULT_IMAGE = "curlimages/curl:latest";
 
     @Schema(
-        title = "ArgoCD API server URL.",
+        title = "ArgoCD API server URL",
         description = "The URL of the ArgoCD API server (e.g., https://argocd.example.com)."
     )
     @NotNull
