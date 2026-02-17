@@ -33,7 +33,7 @@ public abstract class AbstractArgoCD extends Task {
 
     @Schema(
         title = "ArgoCD API server URL",
-        description = "The URL of the ArgoCD API server (e.g., https://argocd.example.com)."
+        description = "The URL of the ArgoCD API server (e.g., `https://argocd.example.com`)."
     )
     @NotNull
     Property<String> server;
