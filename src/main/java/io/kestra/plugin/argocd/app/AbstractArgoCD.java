@@ -4,6 +4,7 @@ import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.models.tasks.runners.ScriptService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
@@ -67,6 +68,7 @@ public abstract class AbstractArgoCD extends Task {
     @Valid
     protected TaskRunner<?> taskRunner = Docker.builder()
         .type(Docker.class.getName())
+        .entryPoint(new ArrayList<>())
         .build();
 
     @Schema(
@@ -86,31 +88,34 @@ public abstract class AbstractArgoCD extends Task {
     protected List<String> getInstallCommands() {
         return List.of(
             "curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64",
-            "chmod +x /tmp/argocd"
+            "chmod +x /tmp/argocd",
+            "export PATH=$PATH:/tmp"
         );
     }
 
-    protected String getLoginCommand(RunContext runContext) throws IllegalVariableEvaluationException {
+    /**
+     * Returns common ArgoCD CLI flags for server connection, authentication, and TLS.
+     */
+    protected String getServerArgs(RunContext runContext) throws IllegalVariableEvaluationException {
         String rServer = runContext.render(this.server).as(String.class).orElseThrow();
         String rToken = runContext.render(this.token).as(String.class).orElseThrow();
 
-        // ArgoCD CLI expects host:port, not a full URL
         if (rServer.startsWith("https://")) {
             rServer = rServer.substring("https://".length());
         } else if (rServer.startsWith("http://")) {
             rServer = rServer.substring("http://".length());
         }
 
-        StringBuilder cmd = new StringBuilder();
-        cmd.append("/tmp/argocd login ").append(rServer);
-        cmd.append(" --auth-token ").append(rToken);
+        StringBuilder args = new StringBuilder();
+        args.append(" --server ").append(rServer);
+        args.append(" --auth-token ").append(rToken);
 
         boolean rInsecure = runContext.render(this.insecure).as(Boolean.class).orElse(true);
         if (rInsecure) {
-            cmd.append(" --insecure");
+            args.append(" --insecure");
         }
 
-        return cmd.toString();
+        return args.toString();
     }
 
     protected Map<String, String> getEnvironmentVariables(RunContext runContext) throws IllegalVariableEvaluationException {
@@ -125,15 +130,10 @@ public abstract class AbstractArgoCD extends Task {
         return envVars;
     }
 
-    protected ScriptOutput executeCommands(RunContext runContext, List<String> commands) throws Exception {
-        return executeCommands(runContext, commands, null);
-    }
-
-    protected ScriptOutput executeCommands(RunContext runContext, List<String> commands, List<String> outputFiles) throws Exception {
+    protected ScriptOutput executeCommands(RunContext runContext, List<String> commands, AbstractLogConsumer logConsumer) throws Exception {
         List<String> allCommands = new ArrayList<>();
 
         allCommands.addAll(getInstallCommands());
-        allCommands.add(getLoginCommand(runContext));
         allCommands.addAll(commands);
 
         String renderedContainerImage = runContext.render(this.containerImage).as(String.class).orElseThrow();
@@ -142,6 +142,8 @@ public abstract class AbstractArgoCD extends Task {
             .withTaskRunner(this.taskRunner)
             .withContainerImage(renderedContainerImage)
             .withEnv(this.getEnvironmentVariables(runContext))
+            .withEnableOutputDirectory(true)
+            .withLogConsumer(logConsumer)
             .withCommands(
                 Property.ofValue(ScriptService.scriptCommands(
                     List.of("/bin/sh", "-c"),
@@ -149,10 +151,6 @@ public abstract class AbstractArgoCD extends Task {
                     allCommands
                 ))
             );
-
-        if (outputFiles != null && !outputFiles.isEmpty()) {
-            commandsWrapper = commandsWrapper.withOutputFiles(outputFiles);
-        }
 
         return commandsWrapper.run();
     }

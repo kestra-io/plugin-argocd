@@ -6,20 +6,16 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.stream.Collectors;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +40,7 @@ import java.util.Map;
 
                 tasks:
                   - id: status
-                    type: io.kestra.plugin.argocd.Status
+                    type: io.kestra.plugin.argocd.app.Status
                     server: "{{ secret('ARGOCD_SERVER') }}"
                     token: "{{ secret('ARGOCD_TOKEN') }}"
                     application: my-application
@@ -59,34 +55,11 @@ import java.util.Map;
 
                 tasks:
                   - id: status
-                    type: io.kestra.plugin.argocd.Status
+                    type: io.kestra.plugin.argocd.app.Status
                     server: "{{ secret('ARGOCD_SERVER') }}"
                     token: "{{ secret('ARGOCD_TOKEN') }}"
                     application: my-application
                     refresh: true
-                """
-        ),
-        @Example(
-            title = "Check application status and conditionally trigger sync",
-            full = true,
-            code = """
-                id: argocd_check_and_sync
-                namespace: company.team
-
-                tasks:
-                  - id: check_status
-                    type: io.kestra.plugin.argocd.Status
-                    server: "{{ secret('ARGOCD_SERVER') }}"
-                    token: "{{ secret('ARGOCD_TOKEN') }}"
-                    application: my-application
-                    refresh: true
-
-                  - id: sync_if_needed
-                    type: io.kestra.plugin.argocd.Sync
-                    server: "{{ secret('ARGOCD_SERVER') }}"
-                    token: "{{ secret('ARGOCD_TOKEN') }}"
-                    application: my-application
-                    runIf: "{{ outputs.check_status.syncStatus == 'OutOfSync' }}"
                 """
         )
     }
@@ -107,7 +80,8 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
         String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
 
         StringBuilder getCmd = new StringBuilder();
-        getCmd.append("/tmp/argocd app get ").append(rApplication);
+        getCmd.append("argocd app get ").append(rApplication);
+        getCmd.append(getServerArgs(runContext));
 
         boolean rRefresh = runContext.render(this.refresh).as(Boolean.class).orElse(false);
         if (rRefresh) {
@@ -116,32 +90,35 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
 
         getCmd.append(" --output json");
 
-        String outputFileName = "status_output.json";
-
         List<String> commands = new ArrayList<>();
-        commands.add(getCmd.toString() + " > " + outputFileName + " 2>&1 || true");
+        commands.add(getCmd.toString());
 
-        List<String> outputFiles = List.of(outputFileName);
-        ScriptOutput scriptOutput = executeCommands(runContext, commands, outputFiles);
-
-        String rawOutput = "";
-        if (scriptOutput.getOutputFiles() != null && scriptOutput.getOutputFiles().containsKey(outputFileName)) {
-            URI outputFileUri = scriptOutput.getOutputFiles().get(outputFileName);
-            try (InputStream is = runContext.storage().getFile(outputFileUri);
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-                rawOutput = reader.lines().collect(Collectors.joining("\n"));
+        StringBuilder stdOutBuilder = new StringBuilder();
+        AbstractLogConsumer logConsumer = new AbstractLogConsumer() {
+            @Override
+            public void accept(String line, Boolean isStdErr) {
+                if (Boolean.FALSE.equals(isStdErr)) {
+                    stdOutBuilder.append(line).append("\n");
+                }
             }
-        }
 
+            @Override
+            public void accept(String line, Boolean isStdErr, Instant timestamp) {
+                accept(line, isStdErr);
+            }
+        };
+
+        ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
+
+        String rawOutput = stdOutBuilder.toString().trim();
         String syncStatus = null;
         String healthStatus = null;
         List<Map<String, Object>> conditions = null;
         List<Map<String, Object>> resources = null;
 
         try {
-            String jsonOutput = extractJson(rawOutput);
-            if (jsonOutput != null && !jsonOutput.isEmpty()) {
-                Map<String, Object> result = OBJECT_MAPPER.readValue(jsonOutput, new TypeReference<Map<String, Object>>() {});
+            if (!rawOutput.isEmpty()) {
+                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {});
 
                 if (result.containsKey("status")) {
                     @SuppressWarnings("unchecked")
@@ -179,33 +156,21 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
         runContext.logger().info("ArgoCD status retrieved - Sync: {}, Health: {}", syncStatus, healthStatus);
 
         return Output.builder()
+            .exitCode(scriptOutput.getExitCode())
+            .stdOutLineCount(scriptOutput.getStdOutLineCount())
+            .stdErrLineCount(scriptOutput.getStdErrLineCount())
+            .vars(scriptOutput.getVars())
             .syncStatus(syncStatus)
             .healthStatus(healthStatus)
             .conditions(conditions)
             .resources(resources)
             .rawOutput(rawOutput)
-            .exitCode(scriptOutput.getExitCode())
             .build();
     }
 
-    private String extractJson(String output) {
-        if (output == null || output.isEmpty()) {
-            return null;
-        }
-
-        int startIndex = output.indexOf('{');
-        int endIndex = output.lastIndexOf('}');
-
-        if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-            return output.substring(startIndex, endIndex + 1);
-        }
-
-        return null;
-    }
-
-    @Builder
+    @SuperBuilder
     @Getter
-    public static class Output implements io.kestra.core.models.tasks.Output {
+    public static class Output extends ScriptOutput {
 
         @Schema(
             title = "Sync status.",
@@ -236,11 +201,5 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
             description = "The raw CLI output for debugging and observability."
         )
         private final String rawOutput;
-
-        @Schema(
-            title = "Exit code.",
-            description = "The exit code from the ArgoCD CLI command."
-        )
-        private final Integer exitCode;
     }
 }

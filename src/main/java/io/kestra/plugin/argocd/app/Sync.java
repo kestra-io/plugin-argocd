@@ -2,19 +2,21 @@ package io.kestra.plugin.argocd.app;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.swagger.v3.oas.annotations.media.Schema;
+
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
-import java.io.InputStream;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,29 @@ import java.util.Map;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
+@Schema(
+    title = "Trigger a synchronization of an ArgoCD Application.",
+    description = "Deploys the desired state from Git to Kubernetes by syncing an ArgoCD application."
+)
+@Plugin(
+    examples = {
+        @Example(
+            title = "Sync an ArgoCD application",
+            full = true,
+            code = """
+                id: argocd_sync
+                namespace: company.team
+
+                tasks:
+                  - id: sync
+                    type: io.kestra.plugin.argocd.app.Sync
+                    server: "{{ secret('ARGOCD_SERVER') }}"
+                    token: "{{ secret('ARGOCD_TOKEN') }}"
+                    application: my-application
+                """
+        )
+    }
+)
 public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
     private static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson();
@@ -66,11 +91,14 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
 
         StringBuilder syncCmd = new StringBuilder();
-        syncCmd.append("/tmp/argocd app sync ").append(rApplication);
+        syncCmd.append("argocd app sync ").append(rApplication);
+        syncCmd.append(getServerArgs(runContext));
 
         if (this.revision != null) {
             String rRevision = runContext.render(this.revision).as(String.class).orElse(null);
-            syncCmd.append(" --revision ").append(rRevision);
+            if (rRevision != null) {
+                syncCmd.append(" --revision ").append(rRevision);
+            }
         }
 
         if (runContext.render(this.prune).as(Boolean.class).orElse(false)) {
@@ -95,29 +123,35 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         syncCmd.append(" --output json");
 
         List<String> commands = new ArrayList<>();
-        commands.add(syncCmd.toString() + " > sync_output.json 2>&1 || true");
+        commands.add(syncCmd.toString());
 
-        ScriptOutput scriptOutput = executeCommands(runContext, commands, List.of("sync_output.json"));
-
-        String rawOutput = "";
-        Map<String, URI> outputFiles = scriptOutput.getOutputFiles();
-        if (outputFiles != null && outputFiles.containsKey("sync_output.json")) {
-            try (InputStream is = runContext.storage().getFile(outputFiles.get("sync_output.json"))) {
-                rawOutput = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        StringBuilder stdOutBuilder = new StringBuilder();
+        AbstractLogConsumer logConsumer = new AbstractLogConsumer() {
+            @Override
+            public void accept(String line, Boolean isStdErr) {
+                if (Boolean.FALSE.equals(isStdErr)) {
+                    stdOutBuilder.append(line).append("\n");
+                }
             }
-        }
 
+            @Override
+            public void accept(String line, Boolean isStdErr, Instant timestamp) {
+                accept(line, isStdErr);
+            }
+        };
+
+        ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
+
+        String rawOutput = stdOutBuilder.toString().trim();
         String syncStatus = null;
         String healthStatus = null;
         String outputRevision = null;
         List<Map<String, Object>> resources = null;
 
         try {
-            String jsonOutput = extractJson(rawOutput);
-            if (jsonOutput != null && !jsonOutput.isEmpty()) {
-                Map<String, Object> result = OBJECT_MAPPER.readValue(jsonOutput, new TypeReference<Map<String, Object>>() {});
+            if (!rawOutput.isEmpty()) {
+                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {});
 
-                // Extract sync status
                 if (result.containsKey("status")) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> status = (Map<String, Object>) result.get("status");
@@ -149,32 +183,21 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         runContext.logger().info("ArgoCD sync completed - Status: {}, Health: {}", syncStatus, healthStatus);
 
         return Output.builder()
+            .exitCode(scriptOutput.getExitCode())
+            .stdOutLineCount(scriptOutput.getStdOutLineCount())
+            .stdErrLineCount(scriptOutput.getStdErrLineCount())
+            .vars(scriptOutput.getVars())
             .syncStatus(syncStatus)
             .healthStatus(healthStatus)
             .revision(outputRevision)
             .resources(resources)
             .rawOutput(rawOutput)
-            .exitCode(scriptOutput.getExitCode())
             .build();
     }
 
-    private String extractJson(String output) {
-        if (output == null || output.isEmpty()) {
-            return  null;
-        }
-
-        int startIndex  = output.indexOf("{");
-        int endIndex = output.lastIndexOf("}");
-
-        if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-            return output.substring(startIndex, endIndex + 1);
-        }
-        return null;
-    }
-
-    @Builder
+    @SuperBuilder
     @Getter
-    public static class Output implements io.kestra.core.models.tasks.Output {
+    public static class Output extends ScriptOutput {
 
         @Schema(
             title = "Sync status.",
@@ -205,11 +228,5 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
             description = "The raw CLI output for debugging and observability."
         )
         private final String rawOutput;
-
-        @Schema(
-            title = "Exit code.",
-            description = "The exit code from the ArgoCD CLI command."
-        )
-        private final Integer exitCode;
     }
 }
