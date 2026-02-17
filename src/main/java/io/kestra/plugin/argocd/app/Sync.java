@@ -219,7 +219,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
         @Schema(
             title = "Resources.",
-            description = "The status of managed Kubernetes resources."
+            description = "Statuses of managed Kubernetes resources returned by ArgoCD."
         )
         private final List<Map<String, Object>> resources;
 
