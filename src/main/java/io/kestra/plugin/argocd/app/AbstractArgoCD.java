@@ -39,7 +39,7 @@ public abstract class AbstractArgoCD extends Task {
     Property<String> server;
 
     @Schema(
-        title = "ArgoCD authentication token.",
+        title = "ArgoCD authentication token",
         description = "The authentication token for ArgoCD API access."
     )
     @NotNull
