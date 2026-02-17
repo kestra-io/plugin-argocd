@@ -225,7 +225,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
         @Schema(
             title = "Raw output.",
-            description = "The raw CLI output for debugging and observability."
+            description = "Unparsed CLI JSON/text for debugging when parsing fails or for additional fields."
         )
         private final String rawOutput;
     }
