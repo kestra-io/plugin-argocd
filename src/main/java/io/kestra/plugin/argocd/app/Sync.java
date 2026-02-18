@@ -181,7 +181,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
         @Schema(
             title = "Health status.",
-            description = "The health status of the application (e.g., 'Healthy', 'Progressing', 'Degraded')."
+            description = "Application health from ArgoCD (e.g., Healthy, Progressing, Degraded)."
         )
         private final String healthStatus;
 
