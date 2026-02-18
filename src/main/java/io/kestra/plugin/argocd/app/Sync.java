@@ -57,24 +57,8 @@ import java.util.Map;
                     server: "{{ secret('ARGOCD_SERVER') }}"
                     token: "{{ secret('ARGOCD_TOKEN') }}"
                     application: my-application
-                    revision: "{{ trigger.commitId }}"
+                    revision: "723b86e01bea11dcf72316cb172868fcbf05d69e"
                     prune: true
-                """
-        ),
-        @Example(
-            title = "Dry-run sync to preview changes",
-            full = true,
-            code = """
-                id: argocd_sync_dry_run
-                namespace: company.team
-
-                tasks:
-                  - id: sync
-                    type: io.kestra.plugin.argocd.app.Sync
-                    server: "{{ secret('ARGOCD_SERVER') }}"
-                    token: "{{ secret('ARGOCD_TOKEN') }}"
-                    application: my-application
-                    dryRun: true
                 """
         ),
         @Example(
