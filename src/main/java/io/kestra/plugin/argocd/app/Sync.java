@@ -186,7 +186,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         private final String healthStatus;
 
         @Schema(
-            title = "Revision.",
+            title = "Revision",
             description = "Git revision (commit SHA) the application ended up syncing to."
         )
         private final String revision;
