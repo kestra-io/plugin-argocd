@@ -43,6 +43,56 @@ import java.util.Map;
                     token: "{{ secret('ARGOCD_TOKEN') }}"
                     application: my-application
                 """
+        ),
+        @Example(
+            title = "Sync to a specific Git revision with pruning",
+            full = true,
+            code = """
+                id: argocd_sync_revision
+                namespace: company.team
+
+                tasks:
+                  - id: sync
+                    type: io.kestra.plugin.argocd.app.Sync
+                    server: "{{ secret('ARGOCD_SERVER') }}"
+                    token: "{{ secret('ARGOCD_TOKEN') }}"
+                    application: my-application
+                    revision: "{{ trigger.commitId }}"
+                    prune: true
+                """
+        ),
+        @Example(
+            title = "Dry-run sync to preview changes",
+            full = true,
+            code = """
+                id: argocd_sync_dry_run
+                namespace: company.team
+
+                tasks:
+                  - id: sync
+                    type: io.kestra.plugin.argocd.app.Sync
+                    server: "{{ secret('ARGOCD_SERVER') }}"
+                    token: "{{ secret('ARGOCD_TOKEN') }}"
+                    application: my-application
+                    dryRun: true
+                """
+        ),
+        @Example(
+            title = "Sync with TLS verification using a custom server certificate",
+            full = true,
+            code = """
+                id: argocd_sync_tls
+                namespace: company.team
+
+                tasks:
+                  - id: sync
+                    type: io.kestra.plugin.argocd.app.Sync
+                    server: "{{ secret('ARGOCD_SERVER') }}"
+                    token: "{{ secret('ARGOCD_TOKEN') }}"
+                    application: my-application
+                    insecure: false
+                    serverCert: "{{ secret('ARGOCD_SERVER_CERT') }}"
+                """
         )
     }
 )
