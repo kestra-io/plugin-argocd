@@ -23,8 +23,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Retrieve the current status of an ArgoCD Application.",
-    description = "Enables orchestration logic to inspect the synchronization and health state of an application."
+    title = "Fetch ArgoCD application status",
+    description = "Reads the application's sync and health state plus conditions/resources; optional refresh forces a live cluster check and raw CLI output is kept for troubleshooting."
 )
 @Plugin(
     examples = {
@@ -64,8 +64,8 @@ import java.util.Map;
 public class Status extends AbstractArgoCD implements RunnableTask<Status.Output> {
 
     @Schema(
-        title = "Force refresh.",
-        description = "Force a status refresh from the cluster before retrieving data."
+        title = "Force refresh",
+        description = "When true, calls `argocd app get --refresh` to bypass cache and re-query the cluster (adds an extra API call)."
     )
     @Builder.Default
     private Property<Boolean> refresh = Property.ofValue(false);
@@ -142,32 +142,32 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
     public static class Output extends ScriptOutput {
 
         @Schema(
-            title = "Sync status.",
-            description = "The synchronization status of the application (e.g., 'Synced', 'OutOfSync')."
+            title = "Sync status",
+            description = "Synchronization status reported by ArgoCD (e.g., `Synced`, `OutOfSync`)."
         )
         private final String syncStatus;
 
         @Schema(
-            title = "Health status.",
-            description = "The health status of the application (e.g., 'Healthy', 'Progressing', 'Degraded')."
+            title = "Health status",
+            description = "Application health from ArgoCD (e.g., Healthy, Progressing, Degraded)."
         )
         private final String healthStatus;
 
         @Schema(
-            title = "Conditions.",
-            description = "The ArgoCD application conditions (warnings, errors, etc.)."
+            title = "Conditions",
+            description = "Application conditions returned by ArgoCD (warnings, errors, etc.)."
         )
         private final List<Map<String, Object>> conditions;
 
         @Schema(
-            title = "Resources.",
-            description = "The status of managed Kubernetes resources."
+            title = "Resources",
+            description = "Statuses of managed Kubernetes resources from the ArgoCD response."
         )
         private final List<Map<String, Object>> resources;
 
         @Schema(
-            title = "Raw output.",
-            description = "The raw CLI output for debugging and observability."
+            title = "Raw output",
+            description = "Unparsed CLI JSON/text for debugging when parsing fails or for additional fields."
         )
         private final String rawOutput;
     }

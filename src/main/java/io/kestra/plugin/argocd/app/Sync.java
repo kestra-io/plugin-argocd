@@ -24,8 +24,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger a synchronization of an ArgoCD Application.",
-    description = "Deploys the desired state from Git to Kubernetes by syncing an ArgoCD application."
+    title = "Synchronize an ArgoCD application",
+    description = "Runs `argocd app sync` to apply the desired Git state to the cluster; supports prune/dry-run/force flags and optional revision or timeout. Raw CLI output is preserved for debugging."
 )
 @Plugin(
     examples = {
@@ -50,13 +50,13 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
     @Schema(
         title = "Git revision",
-        description = "Optional Git revision to sync to."
+        description = "Optional Git commit, tag, or branch to sync to; if omitted, ArgoCD uses the tracked revision."
     )
     private Property<String> revision;
 
     @Schema(
         title = "Prune resources",
-        description = "Whether to prune (delete) resources that are no longer defined in Git."
+        description = "When true, passes `--prune` to delete resources not defined in Git; default false."
     )
     @Builder.Default
     private Property<Boolean> prune = Property.ofValue(false);

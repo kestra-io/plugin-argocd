@@ -44,28 +44,28 @@ public abstract class AbstractArgoCD extends Task {
 
     @Schema(
         title = "ArgoCD authentication token",
-        description = "The authentication token for ArgoCD API access."
+        description = "Bearer token used by the ArgoCD CLI; supply via secrets to avoid logging it."
     )
     @NotNull
     Property<String> token;
 
     @Schema(
         title = "ArgoCD application name",
-        description = "The name of the ArgoCD application to operate on."
+        description = "Target ArgoCD Application object to operate on."
     )
     @NotNull
     Property<String> application;
 
     @Schema(
         title = "Skip TLS verification",
-        description = "Whether to to skip TLS certificate verification when connecting to the ArgoCD server."
+        description = "When true (default), adds --insecure to the CLI and skips server certificate validation."
     )
     @Builder.Default
     Property<Boolean> insecure = Property.ofValue(true);
 
     @Schema(
-        title = "Task runner.",
-        description = "The task runner used to execute the ArgoCD CLI commands inside a container."
+        title = "Task runner",
+        description = "Runner used to launch the ArgoCD CLI container; defaults to Docker with an empty entrypoint."
     )
     @Builder.Default
     @PluginProperty
@@ -76,15 +76,15 @@ public abstract class AbstractArgoCD extends Task {
         .build();
 
     @Schema(
-        title = "Container image.",
-        description = "The container image to use. Defaults to curlimages/curl:latest; the ArgoCD CLI is installed at runtime."
+        title = "Container image",
+        description = "Image that runs the ArgoCD CLI; defaults to `curlimages/curl:latest` and installs the CLI during execution."
     )
     @Builder.Default
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(
-        title = "Additional environment variables.",
-        description = "Additional environment variables to pass to the container."
+        title = "Additional environment variables",
+        description = "Extra environment variables injected into the CLI container; values are rendered with the run context."
     )
     @PluginProperty(dynamic = true)
     protected Map<String, String> env;
