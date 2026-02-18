@@ -174,7 +174,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
     public static class Output extends ScriptOutput {
 
         @Schema(
-            title = "Sync status.",
+            title = "Sync status",
             description = "Synchronization status reported by ArgoCD (e.g., `Synced`, `OutOfSync`)."
         )
         private final String syncStatus;
