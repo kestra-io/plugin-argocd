@@ -175,7 +175,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
         @Schema(
             title = "Sync status.",
-            description = "The synchronization status of the application (e.g., 'Synced', 'OutOfSync')."
+            description = "Synchronization status reported by ArgoCD (e.g., `Synced`, `OutOfSync`)."
         )
         private final String syncStatus;
 
