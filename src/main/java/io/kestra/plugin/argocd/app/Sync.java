@@ -76,7 +76,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
     private Property<Boolean> force = Property.ofValue(false);
 
     @Schema(
-        title = "Sync timeout.",
+        title = "Sync timeout",
         description = "Maximum duration to wait for the sync operation to complete."
     )
     private Property<Duration> timeout;
