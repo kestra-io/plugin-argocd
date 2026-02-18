@@ -97,7 +97,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
     @Schema(
         title = "Dry run mode",
-        description = "Perform a dry-run sync to preview changes without actually applying them."
+        description = "Preview sync changes without applying them (`--dry-run`); default false."
     )
     @Builder.Default
     private Property<Boolean> dryRun = Property.ofValue(false);
