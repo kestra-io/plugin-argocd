@@ -1,14 +1,12 @@
 package io.kestra.plugin.argocd.app;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -16,7 +14,6 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,8 +47,6 @@ import java.util.Map;
     }
 )
 public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
-
-    private static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson();
 
     @Schema(
         title = "Git revision",
@@ -126,19 +121,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         commands.add(syncCmd.toString());
 
         StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = new AbstractLogConsumer() {
-            @Override
-            public void accept(String line, Boolean isStdErr) {
-                if (Boolean.FALSE.equals(isStdErr)) {
-                    stdOutBuilder.append(line).append("\n");
-                }
-            }
-
-            @Override
-            public void accept(String line, Boolean isStdErr, Instant timestamp) {
-                accept(line, isStdErr);
-            }
-        };
+        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
         ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
 
@@ -156,23 +139,14 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> status = (Map<String, Object>) result.get("status");
 
+                    syncStatus = parseSyncStatus(status);
+                    healthStatus = parseHealthStatus(status);
+                    resources = parseResources(status);
+
                     if (status.containsKey("sync")) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> sync = (Map<String, Object>) status.get("sync");
-                        syncStatus = (String) sync.get("status");
                         outputRevision = (String) sync.get("revision");
-                    }
-
-                    if (status.containsKey("health")) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> health = (Map<String, Object>) status.get("health");
-                        healthStatus = (String) health.get("status");
-                    }
-
-                    if (status.containsKey("resources")) {
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> resourceList = (List<Map<String, Object>>) status.get("resources");
-                        resources = resourceList;
                     }
                 }
             }
