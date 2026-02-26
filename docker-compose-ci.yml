@@ -1,0 +1,10 @@
+services:
+  argocd:
+    image: argoproj/argocd:latest
+    container_name: plugin-argocd-ci
+    entrypoint: ["/bin/sh", "-c", "argocd version --client >/dev/null && tail -f /dev/null"]
+    healthcheck:
+      test: ["CMD-SHELL", "argocd version --client >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
