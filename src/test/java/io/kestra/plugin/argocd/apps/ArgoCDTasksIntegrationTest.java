@@ -4,6 +4,7 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.scripts.runner.docker.Docker;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeAll;
@@ -127,12 +128,14 @@ class ArgoCDTasksIntegrationTest {
     }
 
     private RunContext runContext(AbstractArgoCD task) {
-        return runContextFactory.of(task, Map.of(
-            "flow", Map.of(
+        return TestsUtils.mockRunContext(
+            runContextFactory,
+            task,
+            Map.of(
+                "flow", Map.of(
                 "id", "flow",
                 "namespace", "io.kestra.test",
-                "tenantId", "main"
-            )
+                "tenantId", "main")
         ));
     }
 }
