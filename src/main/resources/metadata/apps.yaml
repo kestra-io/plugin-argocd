@@ -1,6 +1,6 @@
-group: io.kestra.plugin.argocd.app
-name: "app"
-title: "Argo CD App"
+group: io.kestra.plugin.argocd.apps
+name: "apps"
+title: "Argo CD Apps"
 description: "Tasks that sync or inspect an Argo CD application via the Argo CD CLI."
 body: "Use `Sync` to apply the desired Git state (supports prune/dry-run/force plus optional revision and timeout) and `Status` to read sync/health, conditions, and resources (optionally with `refresh`). Both tasks need the Argo CD `server`, `token`, and `application` along with optional TLS/connection flags (`insecure`, `plaintext`, `grpcWeb`, `serverCert`) and CLI image/version overrides."
 videos: []

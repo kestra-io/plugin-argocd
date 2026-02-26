@@ -1,4 +1,4 @@
-package io.kestra.plugin.argocd.app;
+package io.kestra.plugin.argocd.apps;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;

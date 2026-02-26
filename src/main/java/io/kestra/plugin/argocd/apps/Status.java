@@ -1,4 +1,4 @@
-package io.kestra.plugin.argocd.app;
+package io.kestra.plugin.argocd.apps;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.kestra.core.models.annotations.Example;
@@ -37,7 +37,7 @@ import java.util.Map;
 
                 tasks:
                   - id: status
-                    type: io.kestra.plugin.argocd.app.Status
+                    type: io.kestra.plugin.argocd.apps.Status
                     server: "{{ secret('ARGOCD_SERVER') }}"
                     token: "{{ secret('ARGOCD_TOKEN') }}"
                     application: my-application
@@ -52,7 +52,7 @@ import java.util.Map;
 
                 tasks:
                   - id: status
-                    type: io.kestra.plugin.argocd.app.Status
+                    type: io.kestra.plugin.argocd.apps.Status
                     server: "{{ secret('ARGOCD_SERVER') }}"
                     token: "{{ secret('ARGOCD_TOKEN') }}"
                     application: my-application

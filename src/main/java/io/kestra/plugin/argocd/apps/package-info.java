@@ -3,7 +3,7 @@
     categories = PluginSubGroup.PluginCategory.INFRASTRUCTURE
 )
 
-package io.kestra.plugin.argocd.app;
+package io.kestra.plugin.argocd.apps;
 
 import io.kestra.core.models.annotations.PluginSubGroup;
 
