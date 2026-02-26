@@ -1,7 +1,7 @@
 group: io.kestra.plugin.argocd
 name: "argocd"
 title: "Argo CD"
-description: "Tasks that interact with Argo CD using the Argo CD CLI. Tasks are executed inside a container and rely on the official Argo CD CLI to perform application synchronization and status inspection."
+description: "GitOps-focused tasks that interact with Argo CD using the Argo CD CLI. Tasks are executed inside a container and rely on the official Argo CD CLI to perform application synchronization and status inspection."
 body: ""
 videos: []
 createdBy: "Kestra Core Team"
