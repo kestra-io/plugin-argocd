@@ -1,21 +1,23 @@
 package io.kestra.plugin.argocd.apps;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.scripts.runner.docker.Docker;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import jakarta.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -133,9 +135,11 @@ class ArgoCDTasksIntegrationTest {
             task,
             Map.of(
                 "flow", Map.of(
-                "id", "flow",
-                "namespace", "io.kestra.test",
-                "tenantId", "main")
-        ));
+                    "id", "flow",
+                    "namespace", "io.kestra.test",
+                    "tenantId", "main"
+                )
+            )
+        );
     }
 }

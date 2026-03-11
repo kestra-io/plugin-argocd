@@ -1,6 +1,12 @@
 package io.kestra.plugin.argocd.apps;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.core.type.TypeReference;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
@@ -8,15 +14,10 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
-import io.swagger.v3.oas.annotations.media.Schema;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -167,7 +168,8 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
         try {
             if (!rawOutput.isEmpty()) {
-                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {
+                });
 
                 if (result.containsKey("status")) {
                     @SuppressWarnings("unchecked")

@@ -1,16 +1,18 @@
 package io.kestra.plugin.argocd.apps;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -61,13 +63,15 @@ class SyncTest {
     }
 
     private RunContext runContext() {
-        return runContextFactory.of(Map.of(
-            "flow", Map.of(
-                "id", "flow",
-                "namespace", "io.kestra.test",
-                "tenantId", "main"
+        return runContextFactory.of(
+            Map.of(
+                "flow", Map.of(
+                    "id", "flow",
+                    "namespace", "io.kestra.test",
+                    "tenantId", "main"
+                )
             )
-        ));
+        );
     }
 
     private static final class StubSync extends Sync {

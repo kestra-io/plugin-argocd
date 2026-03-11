@@ -1,6 +1,13 @@
 package io.kestra.plugin.argocd.apps;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
@@ -13,17 +20,12 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -134,7 +136,7 @@ public abstract class AbstractArgoCD extends Task {
         String rToken = runContext.render(this.token).as(String.class).orElseThrow();
         String rServerCert = runContext.render(this.serverCert).as(String.class).orElse(null);
         Boolean rPlaintext = runContext.render(this.plaintext).as(Boolean.class).orElse(false);
-        Boolean rGrpcWeb  = runContext.render(this.grpcWeb).as(Boolean.class).orElse(false);
+        Boolean rGrpcWeb = runContext.render(this.grpcWeb).as(Boolean.class).orElse(false);
 
         if (rServer.startsWith("https://")) {
             rServer = rServer.substring("https://".length());
@@ -164,7 +166,8 @@ public abstract class AbstractArgoCD extends Task {
     }
 
     protected List<String> getCertCommands() {
-        if (this.serverCert == null) return List.of();
+        if (this.serverCert == null)
+            return List.of();
         return List.of("printf '%s' \"$ARGOCD_SERVER_CERT\" > /tmp/argocd-server.crt");
     }
 
@@ -202,21 +205,24 @@ public abstract class AbstractArgoCD extends Task {
 
     @SuppressWarnings("unchecked")
     protected String parseSyncStatus(Map<String, Object> statusMap) {
-        if (!statusMap.containsKey("sync")) return null;
+        if (!statusMap.containsKey("sync"))
+            return null;
         Map<String, Object> sync = (Map<String, Object>) statusMap.get("sync");
         return (String) sync.get("status");
     }
 
     @SuppressWarnings("unchecked")
     protected String parseHealthStatus(Map<String, Object> statusMap) {
-        if (!statusMap.containsKey("health")) return null;
+        if (!statusMap.containsKey("health"))
+            return null;
         Map<String, Object> health = (Map<String, Object>) statusMap.get("health");
         return (String) health.get("status");
     }
 
     @SuppressWarnings("unchecked")
     protected List<Map<String, Object>> parseResources(Map<String, Object> statusMap) {
-        if (!statusMap.containsKey("resources")) return null;
+        if (!statusMap.containsKey("resources"))
+            return null;
         return (List<Map<String, Object>>) statusMap.get("resources");
     }
 
@@ -236,11 +242,13 @@ public abstract class AbstractArgoCD extends Task {
             .withEnableOutputDirectory(true)
             .withLogConsumer(logConsumer)
             .withCommands(
-                Property.ofValue(ScriptService.scriptCommands(
-                    List.of("/bin/sh", "-c"),
-                    null,
-                    allCommands
-                ))
+                Property.ofValue(
+                    ScriptService.scriptCommands(
+                        List.of("/bin/sh", "-c"),
+                        null,
+                        allCommands
+                    )
+                )
             );
 
         return commandsWrapper.run();
