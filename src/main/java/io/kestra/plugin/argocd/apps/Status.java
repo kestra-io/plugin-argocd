@@ -17,6 +17,7 @@ import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -69,6 +70,7 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
         description = "When true, calls `argocd app get --refresh` to bypass cache and re-query the cluster (adds an extra API call)."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> refresh = Property.ofValue(false);
 
     @Override

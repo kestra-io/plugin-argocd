@@ -18,6 +18,7 @@ import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -87,6 +88,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         title = "Git revision",
         description = "Optional Git commit, tag, or branch to sync to; if omitted, ArgoCD uses the tracked revision."
     )
+    @PluginProperty(group = "advanced")
     private Property<String> revision;
 
     @Schema(
@@ -94,6 +96,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         description = "When true, passes `--prune` to delete resources not defined in Git; default false."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> prune = Property.ofValue(false);
 
     @Schema(
@@ -101,6 +104,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         description = "Preview sync changes without applying them (`--dry-run`); default false."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> dryRun = Property.ofValue(false);
 
     @Schema(
@@ -108,12 +112,14 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         description = "Force the sync operation, which may cause resource recreation."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> force = Property.ofValue(false);
 
     @Schema(
         title = "Sync timeout",
         description = "Maximum duration to wait for the sync operation to complete."
     )
+    @PluginProperty(group = "execution")
     private Property<Duration> timeout;
 
     @Override
