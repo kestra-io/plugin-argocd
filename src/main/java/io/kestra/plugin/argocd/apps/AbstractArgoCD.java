@@ -70,7 +70,7 @@ public abstract class AbstractArgoCD extends Task {
         description = "Runner used to launch the ArgoCD CLI container; defaults to Docker with an empty entrypoint."
     )
     @Builder.Default
-    @PluginProperty
+    @PluginProperty(group = "execution")
     @Valid
     protected TaskRunner<?> taskRunner = Docker.builder()
         .type(Docker.class.getName())
@@ -82,13 +82,14 @@ public abstract class AbstractArgoCD extends Task {
         description = "Image that runs the ArgoCD CLI; defaults to `curlimages/curl:latest` and installs the CLI during execution."
     )
     @Builder.Default
+    @PluginProperty(group = "execution")
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(
         title = "Additional environment variables",
         description = "Extra environment variables injected into the CLI container; values are rendered with the run context."
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "execution")
     protected Map<String, String> env;
 
     @Schema(
