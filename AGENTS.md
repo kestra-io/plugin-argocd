@@ -7,8 +7,9 @@
 
 ## Why
 
-- This plugin integrates Kestra with Argo CD Apps.
-- It provides gitOps-focused tasks that sync or inspect an Argo CD application via the Argo CD CLI. Use `Sync` to apply the desired GitOps Git state and `Status` to read sync/health, conditions, and resources.
+- What user problem does this solve? Teams need to interact with Argo CD using the Argo CD CLI. Tasks are executed inside a container and rely on the official Argo CD CLI to perform application synchronization and status inspection from orchestrated workflows instead of relying on manual console work, ad hoc scripts, or disconnected schedulers.
+- Why would a team adopt this plugin in a workflow? It keeps Argo CD steps in the same Kestra flow as upstream preparation, approvals, retries, notifications, and downstream systems.
+- What operational/business outcome does it enable? It reduces manual handoffs and fragmented tooling while improving reliability, traceability, and delivery speed for processes that depend on Argo CD.
 
 ## How
 
