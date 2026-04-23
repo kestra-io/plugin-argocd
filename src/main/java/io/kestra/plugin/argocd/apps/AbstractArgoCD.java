@@ -42,6 +42,7 @@ public abstract class AbstractArgoCD extends Task {
         description = "The URL of the ArgoCD API server (e.g., `https://argocd.example.com`)."
     )
     @NotNull
+    @PluginProperty(group = "connection", secret = true)
     Property<String> server;
 
     @Schema(
@@ -49,6 +50,7 @@ public abstract class AbstractArgoCD extends Task {
         description = "Bearer token used by the ArgoCD CLI; supply via secrets to avoid logging it."
     )
     @NotNull
+    @PluginProperty(group = "connection", secret = true)
     Property<String> token;
 
     @Schema(
@@ -96,6 +98,7 @@ public abstract class AbstractArgoCD extends Task {
         title = "Server TLS certificate",
         description = "PEM-encoded certificate of the ArgoCD server. Use this when the server uses a self-signed or custom CA certificate. The certificate is written to a temporary file inside the container and passed via `--server-crt`."
     )
+    @PluginProperty(group = "connection", secret = true)
     Property<String> serverCert;
 
     @Schema(
