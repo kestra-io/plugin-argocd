@@ -1,4 +1,5 @@
 @PluginSubGroup(
+    title = "Argo CD Apps",
     description = "This sub-group of plugins contains tasks for using ArgoCD.",
     categories = PluginSubGroup.PluginCategory.INFRASTRUCTURE
 )
