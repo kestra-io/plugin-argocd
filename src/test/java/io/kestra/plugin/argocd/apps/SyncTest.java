@@ -41,7 +41,7 @@ class SyncTest {
         assertNotNull(output.getResources());
         assertEquals("Deployment", output.getResources().getFirst().get("kind"));
         assertEquals(
-            "argocd app sync my-application --server argocd.example.com --auth-token token --insecure --output json",
+            "argocd app sync my-application --server argocd.example.com --auth-token $ARGOCD_TOKEN --output json",
             task.executedCommands().getFirst()
         );
     }
