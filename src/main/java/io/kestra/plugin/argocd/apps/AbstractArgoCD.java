@@ -43,6 +43,7 @@ public abstract class AbstractArgoCD extends Task {
     )
     @NotNull
     @PluginProperty(group = "connection", secret = true)
+    @ToString.Exclude
     Property<String> server;
 
     @Schema(
@@ -51,6 +52,7 @@ public abstract class AbstractArgoCD extends Task {
     )
     @NotNull
     @PluginProperty(group = "connection", secret = true)
+    @ToString.Exclude
     Property<String> token;
 
     @Schema(
@@ -62,10 +64,10 @@ public abstract class AbstractArgoCD extends Task {
 
     @Schema(
         title = "Skip TLS verification",
-        description = "When true (default), adds --insecure to the CLI and skips server certificate validation."
+        description = "When true, adds --insecure to the CLI and skips server certificate validation. Defaults to false (secure). Use the serverCert field to supply a custom CA certificate instead."
     )
     @Builder.Default
-    Property<Boolean> insecure = Property.ofValue(true);
+    Property<Boolean> insecure = Property.ofValue(false);
 
     @Schema(
         title = "Task runner",
@@ -99,6 +101,7 @@ public abstract class AbstractArgoCD extends Task {
         description = "PEM-encoded certificate of the ArgoCD server. Use this when the server uses a self-signed or custom CA certificate. The certificate is written to a temporary file inside the container and passed via `--server-crt`."
     )
     @PluginProperty(group = "connection", secret = true)
+    @ToString.Exclude
     Property<String> serverCert;
 
     @Schema(
@@ -137,7 +140,6 @@ public abstract class AbstractArgoCD extends Task {
 
     protected String getServerArgs(RunContext runContext) throws IllegalVariableEvaluationException {
         String rServer = runContext.render(this.server).as(String.class).orElseThrow();
-        String rToken = runContext.render(this.token).as(String.class).orElseThrow();
         String rServerCert = runContext.render(this.serverCert).as(String.class).orElse(null);
         Boolean rPlaintext = runContext.render(this.plaintext).as(Boolean.class).orElse(false);
         Boolean rGrpcWeb = runContext.render(this.grpcWeb).as(Boolean.class).orElse(false);
@@ -150,9 +152,11 @@ public abstract class AbstractArgoCD extends Task {
 
         StringBuilder args = new StringBuilder();
         args.append(" --server ").append(rServer);
-        args.append(" --auth-token ").append(rToken);
+        // Pass the auth token via ARGOCD_TOKEN environment variable (set in getEnvironmentVariables)
+        // rather than as a CLI argument, to avoid exposing it in process listings and execution logs.
+        args.append(" --auth-token $ARGOCD_TOKEN");
 
-        boolean rInsecure = runContext.render(this.insecure).as(Boolean.class).orElse(true);
+        boolean rInsecure = runContext.render(this.insecure).as(Boolean.class).orElse(false);
         if (rInsecure) {
             args.append(" --insecure");
         }
@@ -184,6 +188,8 @@ public abstract class AbstractArgoCD extends Task {
             }
         }
 
+        // Pass the auth token via environment variable to avoid exposing it in process listings (CWE-214).
+        runContext.render(this.token).as(String.class).ifPresent(rToken -> envVars.put("ARGOCD_TOKEN", rToken));
         runContext.render(this.serverCert).as(String.class).ifPresent(rServerCert -> envVars.put("ARGOCD_SERVER_CERT", rServerCert));
 
         return envVars;
