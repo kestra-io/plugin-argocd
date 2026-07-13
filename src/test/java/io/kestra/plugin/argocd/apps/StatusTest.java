@@ -42,7 +42,7 @@ class StatusTest {
         assertEquals("Warning", output.getConditions().getFirst().get("type"));
         assertEquals("Deployment", output.getResources().getFirst().get("kind"));
         assertEquals(
-            "argocd app get my-application --server argocd.example.com --auth-token token --insecure --output json",
+            "argocd app get my-application --server argocd.example.com --auth-token $ARGOCD_TOKEN --output json",
             task.executedCommands().getFirst()
         );
     }
