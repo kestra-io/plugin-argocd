@@ -6,7 +6,7 @@ Sync and inspect ArgoCD applications from Kestra flows using the ArgoCD CLI.
 
 Set `server` to your ArgoCD API server URL and `token` to a bearer token for ArgoCD CLI authentication. Set `application` to the target ArgoCD application name. Store `token` in a [secret](https://kestra.io/docs/concepts/secret).
 
-By default TLS verification is skipped (`insecure: true`) — set `serverCert` to a PEM-encoded certificate to verify the server instead. For gRPC connections through proxies, set `grpcWeb: true`. The plugin runs the ArgoCD CLI inside a container (`containerImage` defaults to `curlimages/curl:latest`); use `taskRunner` to control where the container runs.
+By default TLS verification is enabled (`insecure: false`); set `insecure: true` to skip certificate validation, or set `serverCert` to a PEM-encoded certificate to verify a self-signed or custom-CA server. For gRPC connections through proxies, set `grpcWeb: true`. The plugin runs the ArgoCD CLI inside a container (`containerImage` defaults to `curlimages/curl:latest`); use `taskRunner` to control where the container runs.
 
 ## Tasks
 
