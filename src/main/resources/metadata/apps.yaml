@@ -1,8 +1,8 @@
 group: io.kestra.plugin.argocd.apps
 name: "apps"
 title: "Argo CD Apps"
-description: "GitOps-focused tasks that sync, inspect or patch an Argo CD application via the Argo CD CLI. Use `Sync` to apply the desired GitOps Git state, `Status` to read sync/health, conditions, and resources, and `Patch` to update the application spec."
-body: "Use `Sync` to apply the desired GitOps Git state (supports prune/dry-run/force plus optional revision and timeout), `Status` to read sync/health, conditions, and resources (optionally with `refresh`), and `Patch` to update the application spec with a JSON or merge patch. All tasks need the Argo CD `server`, `token`, and `application` along with optional TLS/connection flags (`insecure`, `plaintext`, `grpcWeb`, `serverCert`) and CLI image/version overrides."
+description: "GitOps-focused tasks that sync, inspect, patch or manage the lifecycle of an Argo CD application via the Argo CD CLI. Use `Sync` to apply the desired GitOps Git state, `Status` to read sync/health, conditions, and resources, `Patch` to update the application spec, and `Create` to declare a new application."
+body: "Use `Sync` to apply the desired GitOps Git state (supports prune/dry-run/force plus optional revision and timeout), `Status` to read sync/health, conditions, and resources (optionally with `refresh`), `Patch` to update the application spec with a JSON or merge patch, and `Create` to declare an application from a Git repository or from an Application manifest. All tasks need the Argo CD `server`, `token`, and `application` along with optional TLS/connection flags (`insecure`, `plaintext`, `grpcWeb`, `serverCert`) and CLI image/version overrides."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

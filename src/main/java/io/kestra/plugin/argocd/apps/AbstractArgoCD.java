@@ -173,6 +173,11 @@ public abstract class AbstractArgoCD extends Task {
         return args.toString();
     }
 
+    // POSIX single-quote escaping, so a rendered value can never break out of the command.
+    protected static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
+    }
+
     protected List<String> getCertCommands() {
         if (this.serverCert == null)
             return List.of();
