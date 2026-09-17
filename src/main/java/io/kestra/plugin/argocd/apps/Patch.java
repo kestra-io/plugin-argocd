@@ -1,11 +1,6 @@
 package io.kestra.plugin.argocd.apps;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -17,9 +12,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.property.URIFetcher;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
@@ -116,6 +109,7 @@ public class Patch extends AbstractArgoCD implements RunnableTask<Patch.Output> 
         description = "Format of the patch body: `JSON` for a RFC 6902 JSON patch, `MERGE` for a RFC 7386 merge patch."
     )
     @Builder.Default
+    @PluginProperty(group = "main")
     Property<PatchType> patchType = Property.ofValue(PatchType.JSON);
 
     @Schema(
@@ -127,43 +121,45 @@ public class Patch extends AbstractArgoCD implements RunnableTask<Patch.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
-        PatchType rType = runContext.render(this.patchType).as(PatchType.class).orElse(PatchType.JSON);
+        var rApplication = runContext.render(this.application)
+            .as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Missing required property 'application'"));
+        var rType = runContext.render(this.patchType).as(PatchType.class).orElse(PatchType.JSON);
 
-        StringBuilder patchCmd = new StringBuilder();
-        patchCmd.append("argocd app patch ").append(rApplication);
+        var patchCmd = new StringBuilder();
+        patchCmd.append("argocd app patch ").append(shellQuote(rApplication));
         patchCmd.append(getServerArgs(runContext));
 
         // The patch body goes through an environment variable so quotes and braces survive the shell.
         patchCmd.append(" --patch \"$ARGOCD_PATCH\"");
         patchCmd.append(" --type ").append(rType.name().toLowerCase(Locale.ROOT));
 
-        String rAppNamespace = runContext.render(this.appNamespace).as(String.class).orElse(null);
+        var rAppNamespace = runContext.render(this.appNamespace).as(String.class).orElse(null);
         if (rAppNamespace != null) {
-            patchCmd.append(" --app-namespace ").append(rAppNamespace);
+            patchCmd.append(" --app-namespace ").append(shellQuote(rAppNamespace));
         }
 
-        List<String> commands = new ArrayList<>();
+        var commands = new ArrayList<String>();
         commands.add(patchCmd.toString());
 
-        StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
+        var stdOutBuilder = new StringBuilder();
+        var logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
-        ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
+        var scriptOutput = executeCommands(runContext, commands, logConsumer);
 
-        String rawOutput = stdOutBuilder.toString().trim();
+        var rawOutput = stdOutBuilder.toString().trim();
         String syncStatus = null;
         String healthStatus = null;
         Map<String, Object> spec = null;
 
         try {
             if (!rawOutput.isEmpty()) {
-                Map<String, Object> result = YAML_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {
+                var result = YAML_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {
                 });
 
                 if (result.get("status") instanceof Map<?, ?> status) {
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> statusMap = (Map<String, Object>) status;
+                    var statusMap = (Map<String, Object>) status;
 
                     syncStatus = parseSyncStatus(statusMap);
                     healthStatus = parseHealthStatus(statusMap);
@@ -171,7 +167,7 @@ public class Patch extends AbstractArgoCD implements RunnableTask<Patch.Output> 
 
                 if (result.get("spec") instanceof Map<?, ?> specMap) {
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> castSpec = (Map<String, Object>) specMap;
+                    var castSpec = (Map<String, Object>) specMap;
                     spec = castSpec;
                 }
             }
@@ -195,24 +191,10 @@ public class Patch extends AbstractArgoCD implements RunnableTask<Patch.Output> 
 
     @Override
     protected Map<String, String> getEnvironmentVariables(RunContext runContext) throws IllegalVariableEvaluationException {
-        Map<String, String> envVars = super.getEnvironmentVariables(runContext);
-        envVars.put("ARGOCD_PATCH", renderPatch(runContext));
+        var envVars = super.getEnvironmentVariables(runContext);
+        envVars.put("ARGOCD_PATCH", fetchContent(runContext, this.patch, "patch"));
 
         return envVars;
-    }
-
-    private String renderPatch(RunContext runContext) throws IllegalVariableEvaluationException {
-        String rPatch = runContext.render(this.patch).as(String.class).orElseThrow();
-
-        if (!URIFetcher.supports(rPatch)) {
-            return rPatch;
-        }
-
-        try (InputStream inputStream = URIFetcher.of(rPatch).fetch(runContext)) {
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to read the patch file " + rPatch, e);
-        }
     }
 
     @SuperBuilder

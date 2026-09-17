@@ -18,6 +18,8 @@ import jakarta.inject.Inject;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
 class PatchTest {
@@ -49,7 +51,7 @@ class PatchTest {
         assertEquals("Healthy", output.getHealthStatus());
         assertNotNull(output.getSpec());
         assertEquals(
-            "argocd app patch my-application --server argocd.example.com --auth-token $ARGOCD_TOKEN --patch \"$ARGOCD_PATCH\" --type merge",
+            "argocd app patch 'my-application' --server argocd.example.com --auth-token $ARGOCD_TOKEN --patch \"$ARGOCD_PATCH\" --type merge",
             task.executedCommands().getFirst()
         );
     }
@@ -85,6 +87,18 @@ class PatchTest {
             "{\"spec\": {\"source\": {\"targetRevision\": \"master\"}}}",
             task.getEnvironmentVariables(runContext).get("ARGOCD_PATCH")
         );
+    }
+
+    @Test
+    void shouldRejectPatchLargerThanTheEnvironmentVariableLimit() throws Exception {
+        var task = new StubPatch("");
+        task.server = Property.ofValue("https://argocd.example.com");
+        task.token = Property.ofValue("token");
+        task.application = Property.ofValue("my-application");
+        task.patch = Property.ofValue("x".repeat(128 * 1024 + 1));
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.getEnvironmentVariables(runContext()));
+        assertTrue(exception.getMessage().contains("128 KiB"));
     }
 
     @Test

@@ -1,14 +1,8 @@
 package io.kestra.plugin.argocd.apps;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
@@ -16,9 +10,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.property.URIFetcher;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 
@@ -226,9 +218,11 @@ public class Create extends AbstractArgoCD implements RunnableTask<Create.Output
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
+        var rApplication = runContext.render(this.application)
+            .as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Missing required property 'application'"));
 
-        StringBuilder createCmd = new StringBuilder();
+        var createCmd = new StringBuilder();
         createCmd.append("argocd app create ").append(shellQuote(rApplication));
         createCmd.append(getServerArgs(runContext));
 
@@ -247,7 +241,7 @@ public class Create extends AbstractArgoCD implements RunnableTask<Create.Output
         appendIfPresent(createCmd, "--project", runContext.render(this.project).as(String.class).orElse(null));
         appendIfPresent(createCmd, "--app-namespace", runContext.render(this.appNamespace).as(String.class).orElse(null));
 
-        SyncPolicy rSyncPolicy = runContext.render(this.syncPolicy).as(SyncPolicy.class).orElse(null);
+        var rSyncPolicy = runContext.render(this.syncPolicy).as(SyncPolicy.class).orElse(null);
         if (rSyncPolicy != null) {
             createCmd.append(" --sync-policy ").append(rSyncPolicy.name().toLowerCase(Locale.ROOT));
         }
@@ -274,19 +268,19 @@ public class Create extends AbstractArgoCD implements RunnableTask<Create.Output
         runContext.render(this.annotations).asMap(String.class, String.class)
             .forEach((key, value) -> createCmd.append(" --annotations ").append(shellQuote(key + "=" + value)));
 
-        List<String> commands = new ArrayList<>();
+        var commands = new ArrayList<String>();
         commands.add(createCmd.toString());
 
-        StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
+        var stdOutBuilder = new StringBuilder();
+        var logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
-        ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
+        var scriptOutput = executeCommands(runContext, commands, logConsumer);
 
-        String rawOutput = stdOutBuilder.toString().trim();
+        var rawOutput = stdOutBuilder.toString().trim();
         String createdApplication = null;
         String action = null;
 
-        Matcher matcher = RESULT_PATTERN.matcher(rawOutput);
+        var matcher = RESULT_PATTERN.matcher(rawOutput);
         if (matcher.find()) {
             createdApplication = matcher.group("name");
             action = matcher.group("action");
@@ -307,10 +301,10 @@ public class Create extends AbstractArgoCD implements RunnableTask<Create.Output
 
     @Override
     protected Map<String, String> getEnvironmentVariables(RunContext runContext) throws IllegalVariableEvaluationException {
-        Map<String, String> envVars = super.getEnvironmentVariables(runContext);
+        var envVars = super.getEnvironmentVariables(runContext);
 
         if (this.manifest != null) {
-            envVars.put("ARGOCD_MANIFEST", renderManifest(runContext));
+            envVars.put("ARGOCD_MANIFEST", fetchContent(runContext, this.manifest, "manifest"));
         }
 
         return envVars;
@@ -319,20 +313,6 @@ public class Create extends AbstractArgoCD implements RunnableTask<Create.Output
     private void appendIfPresent(StringBuilder command, String flag, String value) {
         if (value != null) {
             command.append(" ").append(flag).append(" ").append(shellQuote(value));
-        }
-    }
-
-    private String renderManifest(RunContext runContext) throws IllegalVariableEvaluationException {
-        String rManifest = runContext.render(this.manifest).as(String.class).orElseThrow();
-
-        if (!URIFetcher.supports(rManifest)) {
-            return rManifest;
-        }
-
-        try (InputStream inputStream = URIFetcher.of(rManifest).fetch(runContext)) {
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to read the manifest file " + rManifest, e);
         }
     }
 

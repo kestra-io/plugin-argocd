@@ -1,7 +1,6 @@
 package io.kestra.plugin.argocd.apps;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 import io.kestra.core.models.annotations.Example;
@@ -9,7 +8,6 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 
@@ -90,6 +88,7 @@ public class Delete extends AbstractArgoCD implements RunnableTask<Delete.Output
         description = "When true, delete every resource managed by the application; when false, only the application object is removed and its resources are orphaned."
     )
     @Builder.Default
+    @PluginProperty(group = "main")
     Property<Boolean> cascade = Property.ofValue(true);
 
     @Schema(
@@ -117,10 +116,12 @@ public class Delete extends AbstractArgoCD implements RunnableTask<Delete.Output
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
-        boolean rCascade = runContext.render(this.cascade).as(Boolean.class).orElse(true);
+        var rApplication = runContext.render(this.application)
+            .as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Missing required property 'application'"));
+        var rCascade = runContext.render(this.cascade).as(Boolean.class).orElse(true);
 
-        StringBuilder deleteCmd = new StringBuilder();
+        var deleteCmd = new StringBuilder();
         deleteCmd.append("argocd app delete ").append(shellQuote(rApplication));
         deleteCmd.append(getServerArgs(runContext));
 
@@ -129,7 +130,7 @@ public class Delete extends AbstractArgoCD implements RunnableTask<Delete.Output
         deleteCmd.append(" --cascade=").append(rCascade);
 
         if (rCascade) {
-            PropagationPolicy rPropagationPolicy = runContext.render(this.propagationPolicy)
+            var rPropagationPolicy = runContext.render(this.propagationPolicy)
                 .as(PropagationPolicy.class)
                 .orElse(PropagationPolicy.FOREGROUND);
 
@@ -140,18 +141,18 @@ public class Delete extends AbstractArgoCD implements RunnableTask<Delete.Output
             deleteCmd.append(" --wait");
         }
 
-        String rAppNamespace = runContext.render(this.appNamespace).as(String.class).orElse(null);
+        var rAppNamespace = runContext.render(this.appNamespace).as(String.class).orElse(null);
         if (rAppNamespace != null) {
             deleteCmd.append(" --app-namespace ").append(shellQuote(rAppNamespace));
         }
 
-        List<String> commands = new ArrayList<>();
+        var commands = new ArrayList<String>();
         commands.add(deleteCmd.toString());
 
-        StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
+        var stdOutBuilder = new StringBuilder();
+        var logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
-        ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
+        var scriptOutput = executeCommands(runContext, commands, logConsumer);
 
         runContext.logger().info("ArgoCD application {} deleted", rApplication);
 

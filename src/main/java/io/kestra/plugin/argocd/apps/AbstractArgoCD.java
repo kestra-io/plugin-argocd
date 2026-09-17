@@ -1,5 +1,8 @@
 package io.kestra.plugin.argocd.apps;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.models.property.URIFetcher;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.models.tasks.runners.ScriptService;
@@ -35,6 +39,7 @@ import lombok.experimental.SuperBuilder;
 public abstract class AbstractArgoCD extends Task {
 
     private static final String DEFAULT_IMAGE = "curlimages/curl:latest";
+    private static final int MAX_CONTENT_SIZE = 128 * 1024;
     protected static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson();
 
     @Schema(
@@ -176,6 +181,34 @@ public abstract class AbstractArgoCD extends Task {
     // POSIX single-quote escaping, so a rendered value can never break out of the command.
     protected static String shellQuote(String value) {
         return "'" + value.replace("'", "'\\''") + "'";
+    }
+
+    /**
+     * Render a property holding either inline content or a URI to a file, and return the content.
+     */
+    protected String fetchContent(RunContext runContext, Property<String> property, String name) throws IllegalVariableEvaluationException {
+        var content = runContext.render(property)
+            .as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Missing required property '" + name + "'"));
+
+        if (!URIFetcher.supports(content)) {
+            return ensureSize(content.getBytes(StandardCharsets.UTF_8), name);
+        }
+
+        try (var inputStream = URIFetcher.of(content).fetch(runContext)) {
+            return ensureSize(inputStream.readNBytes(MAX_CONTENT_SIZE + 1), name);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to read the " + name + " file " + content, e);
+        }
+    }
+
+    // The content ends up in an environment variable, which the kernel caps at 128 KiB per entry (MAX_ARG_STRLEN).
+    private String ensureSize(byte[] content, String name) {
+        if (content.length > MAX_CONTENT_SIZE) {
+            throw new IllegalArgumentException("The " + name + " is larger than the " + (MAX_CONTENT_SIZE / 1024) + " KiB accepted by the ArgoCD CLI container");
+        }
+
+        return new String(content, StandardCharsets.UTF_8);
     }
 
     protected List<String> getCertCommands() {
