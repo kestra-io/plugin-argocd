@@ -15,8 +15,10 @@ import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import jakarta.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
 class StatusTest {
@@ -60,6 +62,17 @@ class StatusTest {
         assertNull(output.getSyncStatus());
         assertNull(output.getHealthStatus());
         assertEquals("not-json", output.getRawOutput());
+    }
+
+    @Test
+    void shouldForwardDurableToCommandsWrapper() throws Exception {
+        var task = Status.builder()
+            .server(Property.ofValue("https://argocd.example.com"))
+            .token(Property.ofValue("token"))
+            .application(Property.ofValue("my-application"));
+
+        assertFalse(task.build().commandsWrapper(runContext(), List.of("true"), null).isDurable());
+        assertTrue(task.durable(Property.ofValue(true)).build().commandsWrapper(runContext(), List.of("true"), null).isDurable());
     }
 
     private RunContext runContext() {

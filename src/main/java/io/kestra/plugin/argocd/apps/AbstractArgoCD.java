@@ -129,6 +129,14 @@ public abstract class AbstractArgoCD extends Task {
     )
     Property<String> argoCDVersion;
 
+    @Builder.Default
+    @Schema(
+        title = "Enable durable features.",
+        description = "If set to `true` you will be able to use checkpointing for in-task recovery points. Checkpoints are exposed to the script as `CHECKPOINTS_<KEY>` environment variables, with the key upper-cased and every character that is not a letter, a digit or `_` replaced by `_`."
+    )
+    @PluginProperty(beta = true, group = "execution")
+    protected Property<Boolean> durable = Property.ofValue(false);
+
     protected List<String> getInstallCommands(RunContext runContext) throws IllegalVariableEvaluationException {
         String rVersion = runContext.render(this.argoCDVersion).as(String.class).orElse(null);
         String arch = "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')";
@@ -275,6 +283,10 @@ public abstract class AbstractArgoCD extends Task {
     }
 
     protected ScriptOutput executeCommands(RunContext runContext, List<String> commands, AbstractLogConsumer logConsumer) throws Exception {
+        return commandsWrapper(runContext, commands, logConsumer).run();
+    }
+
+    protected CommandsWrapper commandsWrapper(RunContext runContext, List<String> commands, AbstractLogConsumer logConsumer) throws IllegalVariableEvaluationException {
         List<String> allCommands = new ArrayList<>();
 
         allCommands.addAll(getInstallCommands(runContext));
@@ -283,11 +295,12 @@ public abstract class AbstractArgoCD extends Task {
 
         String renderedContainerImage = runContext.render(this.containerImage).as(String.class).orElseThrow();
 
-        CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
+        return new CommandsWrapper(runContext)
             .withTaskRunner(this.taskRunner)
             .withContainerImage(renderedContainerImage)
             .withEnv(this.getEnvironmentVariables(runContext))
             .withEnableOutputDirectory(true)
+            .withDurable(runContext.render(this.durable).as(Boolean.class).orElse(false))
             .withLogConsumer(logConsumer)
             .withCommands(
                 Property.ofValue(
@@ -298,7 +311,5 @@ public abstract class AbstractArgoCD extends Task {
                     )
                 )
             );
-
-        return commandsWrapper.run();
     }
 }
