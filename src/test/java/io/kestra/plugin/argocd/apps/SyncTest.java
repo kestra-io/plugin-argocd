@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
@@ -87,11 +88,10 @@ class SyncTest {
 
     @Test
     void shouldQuoteRenderedValuesAsSingleShellWords() throws Exception {
-        var task = new StubSync("{}");
+        var task = new StubSync("{}", Property.ofValue("main'; touch /tmp/pwned2 #"));
         task.server = Property.ofValue("https://argocd.example.com");
         task.token = Property.ofValue("token");
         task.application = Property.ofValue("app'; touch /tmp/pwned #");
-        task.withRevision("main'; touch /tmp/pwned2 #");
 
         task.run(runContext());
 
@@ -113,6 +113,28 @@ class SyncTest {
         );
     }
 
+    @Test
+    void shouldBuildDownloadUrlFromPinnedVersion() throws Exception {
+        for (var version : List.of("2.10.0", "v2.10.0")) {
+            var task = new StubSync("{}", null, Property.ofValue(version));
+
+            assertEquals(
+                "curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/download/v'2.10.0'/argocd-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')",
+                task.getInstallCommands(runContext()).getFirst()
+            );
+        }
+    }
+
+    @Test
+    void shouldRejectInvalidArgoCDVersion() {
+        for (var version : List.of("1/../../x", "2.10.0; id", "", "2.10.0 beta")) {
+            var task = new StubSync("{}", null, Property.ofValue(version));
+
+            var exception = assertThrows(IllegalArgumentException.class, () -> task.getInstallCommands(runContext()));
+            assertTrue(exception.getMessage().contains("argoCDVersion"));
+        }
+    }
+
     private RunContext runContext() {
         return runContextFactory.of(
             Map.of(
@@ -130,14 +152,16 @@ class SyncTest {
         private List<String> executedCommands = List.of();
 
         private StubSync(String stdout) {
-            this.stdout = stdout;
+            this(stdout, null, null);
         }
 
-        // revision is private in Sync and the stub has no builder, so set it reflectively.
-        private void withRevision(String value) throws ReflectiveOperationException {
-            var field = Sync.class.getDeclaredField("revision");
-            field.setAccessible(true);
-            field.set(this, Property.ofValue(value));
+        private StubSync(String stdout, Property<String> revision) {
+            this(stdout, revision, null);
+        }
+
+        private StubSync(String stdout, Property<String> revision, Property<String> argoCDVersion) {
+            super(Sync.builder().revision(revision).argoCDVersion(argoCDVersion));
+            this.stdout = stdout;
         }
 
         @Override

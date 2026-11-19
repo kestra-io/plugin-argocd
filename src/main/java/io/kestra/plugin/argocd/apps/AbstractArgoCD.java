@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -40,6 +41,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
 
     private static final String DEFAULT_IMAGE = "curlimages/curl:latest";
     private static final int MAX_CONTENT_SIZE = 128 * 1024;
+    private static final Pattern VERSION_PATTERN = Pattern.compile("^v?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.]+)?)$");
     protected static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson();
 
     @Schema(
@@ -118,12 +120,21 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
 
     @Schema(
         title = "ArgoCD CLI version",
-        description = "The version of the ArgoCD CLI to download (e.g., `2.10.0`). Defaults to the latest release if not specified."
+        description = "The version of the ArgoCD CLI to download (e.g., `2.10.0`). Defaults to the latest release if not specified. The value must look like `2.10.0` (a leading `v` is accepted)."
     )
     Property<String> argoCDVersion;
 
     protected List<String> getInstallCommands(RunContext runContext) throws IllegalVariableEvaluationException {
         String rVersion = runContext.render(this.argoCDVersion).as(String.class).orElse(null);
+        if (rVersion != null) {
+            var matcher = VERSION_PATTERN.matcher(rVersion);
+            if (!matcher.matches()) {
+                throw new IllegalArgumentException(
+                    "Invalid argoCDVersion '" + rVersion + "': expected a version like 2.10.0 or v2.10.0 (optionally with a pre-release suffix such as 2.10.0-rc1)"
+                );
+            }
+            rVersion = matcher.group(1);
+        }
         String arch = "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')";
         String downloadUrl = rVersion != null
             ? "https://github.com/argoproj/argo-cd/releases/download/v" + shellQuote(rVersion) + "/argocd-linux-" + arch
@@ -254,7 +265,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
     }
 
     // beforeCommands may print before the CLI JSON, so start at the first line that begins with '{'.
-    private static final java.util.regex.Pattern JSON_START = java.util.regex.Pattern.compile("(?m)^[ \\t]*(\\{)");
+    private static final Pattern JSON_START = Pattern.compile("(?m)^[ \\t]*(\\{)");
 
     protected static String extractJson(String raw) {
         var matcher = JSON_START.matcher(raw);
