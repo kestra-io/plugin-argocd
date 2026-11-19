@@ -127,12 +127,22 @@ class SyncTest {
 
     @Test
     void shouldRejectInvalidArgoCDVersion() {
-        for (var version : List.of("1/../../x", "2.10.0; id", "", "2.10.0 beta")) {
+        for (var version : List.of("1/../../x", "2.10.0; id", "", "2.10.0 beta", "2.10.0\n")) {
             var task = new StubSync("{}", null, Property.ofValue(version));
 
             var exception = assertThrows(IllegalArgumentException.class, () -> task.getInstallCommands(runContext()));
             assertTrue(exception.getMessage().contains("argoCDVersion"));
         }
+    }
+
+    @Test
+    void shouldAcceptPreReleaseArgoCDVersion() throws Exception {
+        var task = new StubSync("{}", null, Property.ofValue("v2.10.0-rc1"));
+
+        assertEquals(
+            "curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/download/v'2.10.0-rc1'/argocd-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')",
+            task.getInstallCommands(runContext()).getFirst()
+        );
     }
 
     private RunContext runContext() {
