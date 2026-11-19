@@ -15,14 +15,13 @@ import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.property.URIFetcher;
-import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.models.tasks.runners.ScriptService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.scripts.exec.AbstractExecScript;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
-import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -36,7 +35,7 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public abstract class AbstractArgoCD extends Task {
+public abstract class AbstractArgoCD extends AbstractExecScript {
 
     private static final String DEFAULT_IMAGE = "curlimages/curl:latest";
     private static final int MAX_CONTENT_SIZE = 128 * 1024;
@@ -93,13 +92,6 @@ public abstract class AbstractArgoCD extends Task {
     @Builder.Default
     @PluginProperty(group = "execution")
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
-
-    @Schema(
-        title = "Additional environment variables",
-        description = "Extra environment variables injected into the CLI container; values are rendered with the run context."
-    )
-    @PluginProperty(dynamic = true, group = "execution")
-    protected Map<String, String> env;
 
     @Schema(
         title = "Server TLS certificate",
@@ -218,13 +210,7 @@ public abstract class AbstractArgoCD extends Task {
     }
 
     protected Map<String, String> getEnvironmentVariables(RunContext runContext) throws IllegalVariableEvaluationException {
-        Map<String, String> envVars = new HashMap<>();
-
-        if (this.env != null) {
-            for (Map.Entry<String, String> entry : this.env.entrySet()) {
-                envVars.put(entry.getKey(), runContext.render(entry.getValue()));
-            }
-        }
+        Map<String, String> envVars = new HashMap<>(runContext.render(this.env).asMap(String.class, String.class));
 
         // Pass the auth token via environment variable to avoid exposing it in process listings (CWE-214).
         runContext.render(this.token).as(String.class).ifPresent(rToken -> envVars.put("ARGOCD_TOKEN", rToken));
@@ -275,18 +261,13 @@ public abstract class AbstractArgoCD extends Task {
     }
 
     protected ScriptOutput executeCommands(RunContext runContext, List<String> commands, AbstractLogConsumer logConsumer) throws Exception {
-        List<String> allCommands = new ArrayList<>();
-
+        var allCommands = new ArrayList<>(getBeforeCommandsWithOptions(runContext));
         allCommands.addAll(getInstallCommands(runContext));
         allCommands.addAll(getCertCommands());
         allCommands.addAll(commands);
 
-        String renderedContainerImage = runContext.render(this.containerImage).as(String.class).orElseThrow();
-
-        CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
-            .withTaskRunner(this.taskRunner)
-            .withContainerImage(renderedContainerImage)
-            .withEnv(this.getEnvironmentVariables(runContext))
+        return commands(runContext)
+            .withEnv(getEnvironmentVariables(runContext))
             .withEnableOutputDirectory(true)
             .withLogConsumer(logConsumer)
             .withCommands(
@@ -297,8 +278,7 @@ public abstract class AbstractArgoCD extends Task {
                         allCommands
                     )
                 )
-            );
-
-        return commandsWrapper.run();
+            )
+            .run();
     }
 }

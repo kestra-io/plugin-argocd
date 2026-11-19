@@ -11,12 +11,16 @@ import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
+import io.kestra.plugin.scripts.runner.docker.Docker;
 
 import jakarta.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
 class SyncTest {
@@ -60,6 +64,25 @@ class SyncTest {
         assertNull(output.getHealthStatus());
         assertNull(output.getRevision());
         assertEquals("not-json", output.getRawOutput());
+    }
+
+    @Test
+    void shouldKeepDefaultsAndPassTokenThroughEnvironment() throws Exception {
+        var task = new StubSync("{}");
+        task.server = Property.ofValue("https://argocd.example.com");
+        task.token = Property.ofValue("super-secret-token");
+        task.application = Property.ofValue("my-application");
+        var runContext = runContext();
+
+        var docker = assertInstanceOf(Docker.class, task.getTaskRunner());
+        assertTrue(docker.getEntryPoint().isEmpty());
+        assertEquals("curlimages/curl:latest", runContext.render(task.getContainerImage()).as(String.class).orElseThrow());
+        assertEquals("super-secret-token", task.getEnvironmentVariables(runContext).get("ARGOCD_TOKEN"));
+
+        var rendered = String.join("\n", task.getServerArgs(runContext), String.join("\n", task.getInstallCommands(runContext)));
+        assertFalse(rendered.contains("super-secret-token"));
+        task.run(runContext);
+        assertFalse(String.join("\n", task.executedCommands()).contains("super-secret-token"));
     }
 
     private RunContext runContext() {
