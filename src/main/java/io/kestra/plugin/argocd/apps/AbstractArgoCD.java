@@ -229,9 +229,19 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
 
             @Override
             public void accept(String line, Boolean isStdErr, Instant timestamp) {
-                // Same parsing as DefaultLogConsumer, so ::{}:: lines (outputs, metrics, checkpoints) are honored.
-                // Regular lines such as the ArgoCD JSON output are returned untouched.
-                this.outputs.putAll(PluginUtilsService.parseOut(line, runContext.logger(), runContext, isStdErr, timestamp));
+                var trimmed = line.trim();
+
+                // Only ::{}:: control lines (outputs, metrics, checkpoints) go through parseOut, which logs
+                // every other line at INFO. Regular stdout such as the ArgoCD JSON must stay out of the logs.
+                if (trimmed.startsWith("::{") && trimmed.endsWith("}::")) {
+                    this.outputs.putAll(PluginUtilsService.parseOut(line, runContext.logger(), runContext, isStdErr, timestamp));
+                    if (isStdErr) {
+                        this.stdErrCount.incrementAndGet();
+                    } else {
+                        this.stdOutCount.incrementAndGet();
+                    }
+                    return;
+                }
 
                 if (isStdErr) {
                     this.stdErrCount.incrementAndGet();
@@ -242,6 +252,13 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
                 }
             }
         };
+    }
+
+    // beforeCommands may print before the CLI JSON, so keep only the outermost {...} block.
+    protected static String extractJson(String raw) {
+        var start = raw.indexOf('{');
+        var end = raw.lastIndexOf('}');
+        return start >= 0 && end > start ? raw.substring(start, end + 1) : raw;
     }
 
     @SuppressWarnings("unchecked")

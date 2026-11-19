@@ -103,7 +103,7 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
 
         try {
             if (!rawOutput.isEmpty()) {
-                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {
+                Map<String, Object> result = OBJECT_MAPPER.readValue(extractJson(rawOutput), new TypeReference<Map<String, Object>>() {
                 });
 
                 if (result.containsKey("status")) {

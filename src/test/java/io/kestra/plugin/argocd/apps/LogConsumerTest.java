@@ -10,6 +10,7 @@ import io.kestra.core.runners.RunContextFactory;
 import jakarta.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
 class LogConsumerTest {
@@ -17,7 +18,7 @@ class LogConsumerTest {
     private RunContextFactory runContextFactory;
 
     @Test
-    void shouldParseOutputLinesAndCaptureStdout() {
+    void shouldParseControlLinesAndCaptureOnlyRegularStdout() {
         var runContext = runContextFactory.of(Map.of(
             "flow", Map.of("id", "flow", "namespace", "io.kestra.test", "tenantId", "main")
         ));
@@ -30,12 +31,31 @@ class LogConsumerTest {
         consumer.accept("some warning", true);
 
         assertEquals("v", consumer.getOutputs().get("k"));
-        // Checkpoints are only interpreted by newer Kestra cores; here we check the line goes through the same parser.
+        assertEquals(1, consumer.getOutputs().size());
         assertEquals(3, consumer.getStdOutCount());
         assertEquals(1, consumer.getStdErrCount());
-        assertEquals(
-            "::{\"outputs\":{\"k\":\"v\"}}::\n::{\"checkpoints\":{\"c\":\"d\"}}::\n{\"status\":{\"sync\":{\"status\":\"Synced\"}}}\n",
-            builder.toString()
-        );
+        assertEquals("{\"status\":{\"sync\":{\"status\":\"Synced\"}}}\n", builder.toString());
+    }
+
+    @Test
+    void shouldNotParsePlainLines() {
+        var runContext = runContextFactory.of(Map.of(
+            "flow", Map.of("id", "flow", "namespace", "io.kestra.test", "tenantId", "main")
+        ));
+        var builder = new StringBuilder();
+        var consumer = new Status().buildStdoutConsumer(builder, runContext);
+
+        consumer.accept("attempt 2: resumed", false);
+
+        assertTrue(consumer.getOutputs().isEmpty());
+        assertEquals("attempt 2: resumed\n", builder.toString());
+    }
+
+    @Test
+    void shouldExtractJson() {
+        assertEquals("{\"a\":1}", AbstractArgoCD.extractJson("attempt 2: resumed\n{\"a\":1}"));
+        assertEquals("{\"a\":{\"b\":2}}", AbstractArgoCD.extractJson("{\"a\":{\"b\":2}}"));
+        assertEquals("no braces", AbstractArgoCD.extractJson("no braces"));
+        assertEquals("", AbstractArgoCD.extractJson(""));
     }
 }
