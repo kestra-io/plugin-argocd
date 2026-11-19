@@ -211,7 +211,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
     }
 
     protected Map<String, String> getEnvironmentVariables(RunContext runContext) throws IllegalVariableEvaluationException {
-        Map<String, String> envVars = new HashMap<>(runContext.render(this.env).asMap(String.class, String.class));
+        var envVars = new HashMap<String, String>(runContext.render(this.env).asMap(String.class, String.class));
 
         // Pass the auth token via environment variable to avoid exposing it in process listings (CWE-214).
         runContext.render(this.token).as(String.class).ifPresent(rToken -> envVars.put("ARGOCD_TOKEN", rToken));
@@ -231,10 +231,9 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
             public void accept(String line, Boolean isStdErr, Instant timestamp) {
                 var trimmed = line.trim();
 
-                // Only ::{}:: control lines (outputs, metrics, checkpoints) go through parseOut, which logs
-                // every other line at INFO. Regular stdout such as the ArgoCD JSON must stay out of the logs.
+                // Only ::{}:: control lines go through parseOut, which would log regular stdout such as the ArgoCD JSON.
                 if (trimmed.startsWith("::{") && trimmed.endsWith("}::")) {
-                    this.outputs.putAll(PluginUtilsService.parseOut(line, runContext.logger(), runContext, isStdErr, timestamp));
+                    this.outputs.putAll(PluginUtilsService.parseOut(trimmed, runContext.logger(), runContext, isStdErr, timestamp));
                     if (isStdErr) {
                         this.stdErrCount.incrementAndGet();
                     } else {
@@ -254,11 +253,12 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
         };
     }
 
-    // beforeCommands may print before the CLI JSON, so keep only the outermost {...} block.
+    // beforeCommands may print before the CLI JSON, so start at the first line that begins with '{'.
+    private static final java.util.regex.Pattern JSON_START = java.util.regex.Pattern.compile("(?m)^[ \\t]*(\\{)");
+
     protected static String extractJson(String raw) {
-        var start = raw.indexOf('{');
-        var end = raw.lastIndexOf('}');
-        return start >= 0 && end > start ? raw.substring(start, end + 1) : raw;
+        var matcher = JSON_START.matcher(raw);
+        return matcher.find() ? raw.substring(matcher.end(1) - 1) : raw;
     }
 
     @SuppressWarnings("unchecked")

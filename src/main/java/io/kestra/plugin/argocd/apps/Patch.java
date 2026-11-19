@@ -29,7 +29,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Patch an ArgoCD application",
-    description = "Runs `argocd app patch` to update the application spec in place with a JSON patch or a merge patch. The CLI returns the patched application as YAML, which is parsed into the task outputs."
+    description = "Runs `argocd app patch` to update the application spec in place with a JSON patch or a merge patch. The CLI returns the patched application as YAML, which is parsed into the task outputs. Stdout printed by `beforeCommands` prevents the application output from being parsed, so avoid printing to stdout there."
 )
 @Plugin(
     examples = {

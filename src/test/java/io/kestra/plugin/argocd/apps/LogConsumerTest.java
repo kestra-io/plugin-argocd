@@ -55,6 +55,8 @@ class LogConsumerTest {
     void shouldExtractJson() {
         assertEquals("{\"a\":1}", AbstractArgoCD.extractJson("attempt 2: resumed\n{\"a\":1}"));
         assertEquals("{\"a\":{\"b\":2}}", AbstractArgoCD.extractJson("{\"a\":{\"b\":2}}"));
+        assertEquals("{\"a\":1}", AbstractArgoCD.extractJson("value {x}\n{\"a\":1}"));
+        assertEquals("{\"a\":1}", AbstractArgoCD.extractJson("value {x}\n  {\"a\":1}"));
         assertEquals("no braces", AbstractArgoCD.extractJson("no braces"));
         assertEquals("", AbstractArgoCD.extractJson(""));
     }
