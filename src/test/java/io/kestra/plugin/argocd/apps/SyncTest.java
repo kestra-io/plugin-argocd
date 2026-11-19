@@ -45,7 +45,7 @@ class SyncTest {
         assertNotNull(output.getResources());
         assertEquals("Deployment", output.getResources().getFirst().get("kind"));
         assertEquals(
-            "argocd app sync my-application --server argocd.example.com --auth-token $ARGOCD_TOKEN --output json",
+            "argocd app sync 'my-application' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN --output json",
             task.executedCommands().getFirst()
         );
     }
@@ -85,6 +85,34 @@ class SyncTest {
         assertFalse(String.join("\n", task.executedCommands()).contains("super-secret-token"));
     }
 
+    @Test
+    void shouldQuoteRenderedValuesAsSingleShellWords() throws Exception {
+        var task = new StubSync("{}");
+        task.server = Property.ofValue("https://argocd.example.com");
+        task.token = Property.ofValue("token");
+        task.application = Property.ofValue("app'; touch /tmp/pwned #");
+        task.withRevision("main'; touch /tmp/pwned2 #");
+
+        task.run(runContext());
+
+        assertEquals(
+            "argocd app sync 'app'\\''; touch /tmp/pwned #' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN"
+                + " --revision 'main'\\''; touch /tmp/pwned2 #' --output json",
+            task.executedCommands().getFirst()
+        );
+    }
+
+    @Test
+    void shouldQuoteServer() throws Exception {
+        var task = new StubSync("{}");
+        task.server = Property.ofValue("argocd.example.com; touch /tmp/pwned");
+
+        assertEquals(
+            " --server 'argocd.example.com; touch /tmp/pwned' --auth-token $ARGOCD_TOKEN",
+            task.getServerArgs(runContext())
+        );
+    }
+
     private RunContext runContext() {
         return runContextFactory.of(
             Map.of(
@@ -103,6 +131,13 @@ class SyncTest {
 
         private StubSync(String stdout) {
             this.stdout = stdout;
+        }
+
+        // revision is private in Sync and the stub has no builder, so set it reflectively.
+        private void withRevision(String value) throws ReflectiveOperationException {
+            var field = Sync.class.getDeclaredField("revision");
+            field.setAccessible(true);
+            field.set(this, Property.ofValue(value));
         }
 
         @Override

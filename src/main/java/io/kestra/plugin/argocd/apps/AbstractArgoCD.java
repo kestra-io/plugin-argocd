@@ -126,7 +126,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
         String rVersion = runContext.render(this.argoCDVersion).as(String.class).orElse(null);
         String arch = "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')";
         String downloadUrl = rVersion != null
-            ? "https://github.com/argoproj/argo-cd/releases/download/v" + rVersion + "/argocd-linux-" + arch
+            ? "https://github.com/argoproj/argo-cd/releases/download/v" + shellQuote(rVersion) + "/argocd-linux-" + arch
             : "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-" + arch;
 
         return List.of(
@@ -149,7 +149,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
         }
 
         StringBuilder args = new StringBuilder();
-        args.append(" --server ").append(rServer);
+        args.append(" --server ").append(shellQuote(rServer));
         // Pass the auth token via ARGOCD_TOKEN environment variable (set in getEnvironmentVariables)
         // rather than as a CLI argument, to avoid exposing it in process listings and execution logs.
         args.append(" --auth-token $ARGOCD_TOKEN");

@@ -126,13 +126,13 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
 
         StringBuilder syncCmd = new StringBuilder();
-        syncCmd.append("argocd app sync ").append(rApplication);
+        syncCmd.append("argocd app sync ").append(shellQuote(rApplication));
         syncCmd.append(getServerArgs(runContext));
 
         if (this.revision != null) {
             String rRevision = runContext.render(this.revision).as(String.class).orElse(null);
             if (rRevision != null) {
-                syncCmd.append(" --revision ").append(rRevision);
+                syncCmd.append(" --revision ").append(shellQuote(rRevision));
             }
         }
 

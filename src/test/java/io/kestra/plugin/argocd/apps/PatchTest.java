@@ -51,7 +51,7 @@ class PatchTest {
         assertEquals("Healthy", output.getHealthStatus());
         assertNotNull(output.getSpec());
         assertEquals(
-            "argocd app patch 'my-application' --server argocd.example.com --auth-token $ARGOCD_TOKEN --patch \"$ARGOCD_PATCH\" --type merge",
+            "argocd app patch 'my-application' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN --patch \"$ARGOCD_PATCH\" --type merge",
             task.executedCommands().getFirst()
         );
     }
