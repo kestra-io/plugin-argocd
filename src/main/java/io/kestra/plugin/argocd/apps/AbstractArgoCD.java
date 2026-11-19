@@ -87,7 +87,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
 
     @Schema(
         title = "Container image",
-        description = "Image that runs the ArgoCD CLI; defaults to `curlimages/curl:latest` and installs the CLI during execution."
+        description = "Image that runs the ArgoCD CLI; defaults to `curlimages/curl:latest` and installs the CLI during execution. Note that `beforeCommands` run before the CLI is installed, so they cannot call `argocd`."
     )
     @Builder.Default
     @PluginProperty(group = "execution")

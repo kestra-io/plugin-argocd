@@ -117,7 +117,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
     @Schema(
         title = "Sync timeout",
-        description = "Maximum duration to wait for the sync operation to complete."
+        description = "Maximum duration to wait for the sync operation to complete. It is passed to `argocd app sync --timeout` and also applied to the whole container run."
     )
     @PluginProperty(group = "execution")
     private Property<Duration> timeout;
