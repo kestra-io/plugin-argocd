@@ -11,7 +11,6 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 
@@ -162,7 +161,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         commands.add(syncCmd.toString());
 
         StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
+        var logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
         ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
 

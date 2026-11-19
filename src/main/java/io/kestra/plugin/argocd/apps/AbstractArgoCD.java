@@ -16,6 +16,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.property.URIFetcher;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
+import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.models.tasks.runners.ScriptService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
@@ -223,16 +224,22 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
         return new AbstractLogConsumer() {
             @Override
             public void accept(String line, Boolean isStdErr) {
-                if (Boolean.FALSE.equals(isStdErr)) {
-                    builder.append(line).append("\n");
-                } else {
-                    runContext.logger().warn(line);
-                }
+                accept(line, isStdErr, null);
             }
 
             @Override
             public void accept(String line, Boolean isStdErr, Instant timestamp) {
-                accept(line, isStdErr);
+                // Same parsing as DefaultLogConsumer, so ::{}:: lines (outputs, metrics, checkpoints) are honored.
+                // Regular lines such as the ArgoCD JSON output are returned untouched.
+                this.outputs.putAll(PluginUtilsService.parseOut(line, runContext.logger(), runContext, isStdErr, timestamp));
+
+                if (isStdErr) {
+                    this.stdErrCount.incrementAndGet();
+                    runContext.logger().warn(line);
+                } else {
+                    this.stdOutCount.incrementAndGet();
+                    builder.append(line).append("\n");
+                }
             }
         };
     }
@@ -266,6 +273,8 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
         allCommands.addAll(getCertCommands());
         allCommands.addAll(commands);
 
+        var rInterpreter = runContext.render(getInterpreter()).asList(String.class);
+
         return commands(runContext)
             .withEnv(getEnvironmentVariables(runContext))
             .withEnableOutputDirectory(true)
@@ -273,7 +282,7 @@ public abstract class AbstractArgoCD extends AbstractExecScript {
             .withCommands(
                 Property.ofValue(
                     ScriptService.scriptCommands(
-                        List.of("/bin/sh", "-c"),
+                        rInterpreter.isEmpty() ? List.of("/bin/sh", "-c") : rInterpreter,
                         null,
                         allCommands
                     )
