@@ -32,7 +32,7 @@ class DeleteTest {
 
         assertEquals(0, output.getExitCode());
         assertEquals(
-            "argocd app delete 'my-application' --server argocd.example.com --auth-token $ARGOCD_TOKEN"
+            "argocd app delete 'my-application' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN"
                 + " --yes --cascade=true --propagation-policy foreground",
             task.executedCommands().getFirst()
         );
@@ -51,7 +51,7 @@ class DeleteTest {
         task.run(runContext());
 
         assertEquals(
-            "argocd app delete 'my-application' --server argocd.example.com --auth-token $ARGOCD_TOKEN"
+            "argocd app delete 'my-application' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN"
                 + " --yes --cascade=false --wait --app-namespace 'argocd'",
             task.executedCommands().getFirst()
         );

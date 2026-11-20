@@ -42,7 +42,7 @@ class StatusTest {
         assertEquals("Warning", output.getConditions().getFirst().get("type"));
         assertEquals("Deployment", output.getResources().getFirst().get("kind"));
         assertEquals(
-            "argocd app get my-application --server argocd.example.com --auth-token $ARGOCD_TOKEN --output json",
+            "argocd app get 'my-application' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN --output json",
             task.executedCommands().getFirst()
         );
     }
@@ -60,6 +60,21 @@ class StatusTest {
         assertNull(output.getSyncStatus());
         assertNull(output.getHealthStatus());
         assertEquals("not-json", output.getRawOutput());
+    }
+
+    @Test
+    void shouldQuoteApplicationAsSingleShellWord() throws Exception {
+        var task = new StubStatus("{}");
+        task.server = Property.ofValue("https://argocd.example.com");
+        task.token = Property.ofValue("token");
+        task.application = Property.ofValue("app'; touch /tmp/pwned #");
+
+        task.run(runContext());
+
+        assertEquals(
+            "argocd app get 'app'\\''; touch /tmp/pwned #' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN --output json",
+            task.executedCommands().getFirst()
+        );
     }
 
     private RunContext runContext() {

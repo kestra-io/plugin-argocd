@@ -10,7 +10,6 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 
@@ -78,7 +77,7 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
         String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
 
         StringBuilder getCmd = new StringBuilder();
-        getCmd.append("argocd app get ").append(rApplication);
+        getCmd.append("argocd app get ").append(shellQuote(rApplication));
         getCmd.append(getServerArgs(runContext));
 
         boolean rRefresh = runContext.render(this.refresh).as(Boolean.class).orElse(false);
@@ -92,7 +91,7 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
         commands.add(getCmd.toString());
 
         StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
+        var logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
         ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
 
@@ -104,7 +103,7 @@ public class Status extends AbstractArgoCD implements RunnableTask<Status.Output
 
         try {
             if (!rawOutput.isEmpty()) {
-                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {
+                var result = OBJECT_MAPPER.readValue(extractJson(rawOutput), new TypeReference<Map<String, Object>>() {
                 });
 
                 if (result.containsKey("status")) {

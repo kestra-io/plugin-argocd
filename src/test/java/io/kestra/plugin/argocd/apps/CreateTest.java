@@ -44,7 +44,7 @@ class CreateTest {
         assertEquals("guestbook", output.getApplication());
         assertEquals("created", output.getAction());
         assertEquals(
-            "argocd app create 'guestbook' --server argocd.example.com --auth-token $ARGOCD_TOKEN"
+            "argocd app create 'guestbook' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN"
                 + " --repo 'https://github.com/argoproj/argocd-example-apps.git' --path 'guestbook'"
                 + " --dest-server 'https://kubernetes.default.svc' --dest-namespace 'default'"
                 + " --sync-policy automated --auto-prune --upsert --label 'env=prod'",
@@ -70,7 +70,7 @@ class CreateTest {
         assertEquals("updated", output.getAction());
         assertEquals(
             "printf '%s' \"$ARGOCD_MANIFEST\" | argocd app create 'guestbook'"
-                + " --server argocd.example.com --auth-token $ARGOCD_TOKEN --file -",
+                + " --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN --file -",
             task.executedCommands().getFirst()
         );
         assertEquals(

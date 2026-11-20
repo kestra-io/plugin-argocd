@@ -11,12 +11,17 @@ import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
+import io.kestra.plugin.scripts.runner.docker.Docker;
 
 import jakarta.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @KestraTest
 class SyncTest {
@@ -41,7 +46,7 @@ class SyncTest {
         assertNotNull(output.getResources());
         assertEquals("Deployment", output.getResources().getFirst().get("kind"));
         assertEquals(
-            "argocd app sync my-application --server argocd.example.com --auth-token $ARGOCD_TOKEN --output json",
+            "argocd app sync 'my-application' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN --output json",
             task.executedCommands().getFirst()
         );
     }
@@ -62,6 +67,84 @@ class SyncTest {
         assertEquals("not-json", output.getRawOutput());
     }
 
+    @Test
+    void shouldKeepDefaultsAndPassTokenThroughEnvironment() throws Exception {
+        var task = new StubSync("{}");
+        task.server = Property.ofValue("https://argocd.example.com");
+        task.token = Property.ofValue("super-secret-token");
+        task.application = Property.ofValue("my-application");
+        var runContext = runContext();
+
+        var docker = assertInstanceOf(Docker.class, task.getTaskRunner());
+        assertTrue(docker.getEntryPoint().isEmpty());
+        assertEquals("curlimages/curl:latest", runContext.render(task.getContainerImage()).as(String.class).orElseThrow());
+        assertEquals("super-secret-token", task.getEnvironmentVariables(runContext).get("ARGOCD_TOKEN"));
+
+        var rendered = String.join("\n", task.getServerArgs(runContext), String.join("\n", task.getInstallCommands(runContext)));
+        assertFalse(rendered.contains("super-secret-token"));
+        task.run(runContext);
+        assertFalse(String.join("\n", task.executedCommands()).contains("super-secret-token"));
+    }
+
+    @Test
+    void shouldQuoteRenderedValuesAsSingleShellWords() throws Exception {
+        var task = new StubSync("{}", Property.ofValue("main'; touch /tmp/pwned2 #"));
+        task.server = Property.ofValue("https://argocd.example.com");
+        task.token = Property.ofValue("token");
+        task.application = Property.ofValue("app'; touch /tmp/pwned #");
+
+        task.run(runContext());
+
+        assertEquals(
+            "argocd app sync 'app'\\''; touch /tmp/pwned #' --server 'argocd.example.com' --auth-token $ARGOCD_TOKEN"
+                + " --revision 'main'\\''; touch /tmp/pwned2 #' --output json",
+            task.executedCommands().getFirst()
+        );
+    }
+
+    @Test
+    void shouldQuoteServer() throws Exception {
+        var task = new StubSync("{}");
+        task.server = Property.ofValue("argocd.example.com; touch /tmp/pwned");
+
+        assertEquals(
+            " --server 'argocd.example.com; touch /tmp/pwned' --auth-token $ARGOCD_TOKEN",
+            task.getServerArgs(runContext())
+        );
+    }
+
+    @Test
+    void shouldBuildDownloadUrlFromPinnedVersion() throws Exception {
+        for (var version : List.of("2.10.0", "v2.10.0")) {
+            var task = new StubSync("{}", null, Property.ofValue(version));
+
+            assertEquals(
+                "curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/download/v'2.10.0'/argocd-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')",
+                task.getInstallCommands(runContext()).getFirst()
+            );
+        }
+    }
+
+    @Test
+    void shouldRejectInvalidArgoCDVersion() {
+        for (var version : List.of("1/../../x", "2.10.0; id", "", "2.10.0 beta", "2.10.0\n")) {
+            var task = new StubSync("{}", null, Property.ofValue(version));
+
+            var exception = assertThrows(IllegalArgumentException.class, () -> task.getInstallCommands(runContext()));
+            assertTrue(exception.getMessage().contains("argoCDVersion"));
+        }
+    }
+
+    @Test
+    void shouldAcceptPreReleaseArgoCDVersion() throws Exception {
+        var task = new StubSync("{}", null, Property.ofValue("v2.10.0-rc1"));
+
+        assertEquals(
+            "curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/download/v'2.10.0-rc1'/argocd-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')",
+            task.getInstallCommands(runContext()).getFirst()
+        );
+    }
+
     private RunContext runContext() {
         return runContextFactory.of(
             Map.of(
@@ -79,6 +162,15 @@ class SyncTest {
         private List<String> executedCommands = List.of();
 
         private StubSync(String stdout) {
+            this(stdout, null, null);
+        }
+
+        private StubSync(String stdout, Property<String> revision) {
+            this(stdout, revision, null);
+        }
+
+        private StubSync(String stdout, Property<String> revision, Property<String> argoCDVersion) {
+            super(Sync.builder().revision(revision).argoCDVersion(argoCDVersion));
             this.stdout = stdout;
         }
 

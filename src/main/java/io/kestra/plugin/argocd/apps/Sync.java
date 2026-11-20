@@ -11,7 +11,6 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 
@@ -117,7 +116,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
     @Schema(
         title = "Sync timeout",
-        description = "Maximum duration to wait for the sync operation to complete."
+        description = "Maximum duration to wait for the sync operation to complete. It is passed to `argocd app sync --timeout` and also applied to the whole container run."
     )
     @PluginProperty(group = "execution")
     private Property<Duration> timeout;
@@ -127,13 +126,13 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         String rApplication = runContext.render(this.application).as(String.class).orElseThrow();
 
         StringBuilder syncCmd = new StringBuilder();
-        syncCmd.append("argocd app sync ").append(rApplication);
+        syncCmd.append("argocd app sync ").append(shellQuote(rApplication));
         syncCmd.append(getServerArgs(runContext));
 
         if (this.revision != null) {
             String rRevision = runContext.render(this.revision).as(String.class).orElse(null);
             if (rRevision != null) {
-                syncCmd.append(" --revision ").append(rRevision);
+                syncCmd.append(" --revision ").append(shellQuote(rRevision));
             }
         }
 
@@ -162,7 +161,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
         commands.add(syncCmd.toString());
 
         StringBuilder stdOutBuilder = new StringBuilder();
-        AbstractLogConsumer logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
+        var logConsumer = buildStdoutConsumer(stdOutBuilder, runContext);
 
         ScriptOutput scriptOutput = executeCommands(runContext, commands, logConsumer);
 
@@ -174,7 +173,7 @@ public class Sync extends AbstractArgoCD implements RunnableTask<Sync.Output> {
 
         try {
             if (!rawOutput.isEmpty()) {
-                Map<String, Object> result = OBJECT_MAPPER.readValue(rawOutput, new TypeReference<Map<String, Object>>() {
+                var result = OBJECT_MAPPER.readValue(extractJson(rawOutput), new TypeReference<Map<String, Object>>() {
                 });
 
                 if (result.containsKey("status")) {

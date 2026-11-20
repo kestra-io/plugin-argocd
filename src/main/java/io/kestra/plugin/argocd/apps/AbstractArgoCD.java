@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -15,14 +16,14 @@ import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.property.URIFetcher;
-import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.AbstractLogConsumer;
+import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.models.tasks.runners.ScriptService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.scripts.exec.AbstractExecScript;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
-import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -36,10 +37,11 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public abstract class AbstractArgoCD extends Task {
+public abstract class AbstractArgoCD extends AbstractExecScript {
 
     private static final String DEFAULT_IMAGE = "curlimages/curl:latest";
     private static final int MAX_CONTENT_SIZE = 128 * 1024;
+    private static final Pattern VERSION_PATTERN = Pattern.compile("^v?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.]+)?)$");
     protected static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson();
 
     @Schema(
@@ -88,18 +90,11 @@ public abstract class AbstractArgoCD extends Task {
 
     @Schema(
         title = "Container image",
-        description = "Image that runs the ArgoCD CLI; defaults to `curlimages/curl:latest` and installs the CLI during execution."
+        description = "Image that runs the ArgoCD CLI; defaults to `curlimages/curl:latest` and installs the CLI during execution. Note that `beforeCommands` run before the CLI is installed, so they cannot call `argocd`."
     )
     @Builder.Default
     @PluginProperty(group = "execution")
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
-
-    @Schema(
-        title = "Additional environment variables",
-        description = "Extra environment variables injected into the CLI container; values are rendered with the run context."
-    )
-    @PluginProperty(dynamic = true, group = "execution")
-    protected Map<String, String> env;
 
     @Schema(
         title = "Server TLS certificate",
@@ -125,15 +120,24 @@ public abstract class AbstractArgoCD extends Task {
 
     @Schema(
         title = "ArgoCD CLI version",
-        description = "The version of the ArgoCD CLI to download (e.g., `2.10.0`). Defaults to the latest release if not specified."
+        description = "The version of the ArgoCD CLI to download (e.g., `2.10.0`). Defaults to the latest release if not specified. The value must look like `2.10.0` (a leading `v` is accepted)."
     )
     Property<String> argoCDVersion;
 
     protected List<String> getInstallCommands(RunContext runContext) throws IllegalVariableEvaluationException {
         String rVersion = runContext.render(this.argoCDVersion).as(String.class).orElse(null);
+        if (rVersion != null) {
+            var matcher = VERSION_PATTERN.matcher(rVersion);
+            if (!matcher.matches()) {
+                throw new IllegalArgumentException(
+                    "Invalid argoCDVersion '" + rVersion + "': expected a version like 2.10.0 or v2.10.0 (optionally with a pre-release suffix such as 2.10.0-rc1)"
+                );
+            }
+            rVersion = matcher.group(1);
+        }
         String arch = "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')";
         String downloadUrl = rVersion != null
-            ? "https://github.com/argoproj/argo-cd/releases/download/v" + rVersion + "/argocd-linux-" + arch
+            ? "https://github.com/argoproj/argo-cd/releases/download/v" + shellQuote(rVersion) + "/argocd-linux-" + arch
             : "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-" + arch;
 
         return List.of(
@@ -156,7 +160,7 @@ public abstract class AbstractArgoCD extends Task {
         }
 
         StringBuilder args = new StringBuilder();
-        args.append(" --server ").append(rServer);
+        args.append(" --server ").append(shellQuote(rServer));
         // Pass the auth token via ARGOCD_TOKEN environment variable (set in getEnvironmentVariables)
         // rather than as a CLI argument, to avoid exposing it in process listings and execution logs.
         args.append(" --auth-token $ARGOCD_TOKEN");
@@ -218,13 +222,7 @@ public abstract class AbstractArgoCD extends Task {
     }
 
     protected Map<String, String> getEnvironmentVariables(RunContext runContext) throws IllegalVariableEvaluationException {
-        Map<String, String> envVars = new HashMap<>();
-
-        if (this.env != null) {
-            for (Map.Entry<String, String> entry : this.env.entrySet()) {
-                envVars.put(entry.getKey(), runContext.render(entry.getValue()));
-            }
-        }
+        var envVars = new HashMap<String, String>(runContext.render(this.env).asMap(String.class, String.class));
 
         // Pass the auth token via environment variable to avoid exposing it in process listings (CWE-214).
         runContext.render(this.token).as(String.class).ifPresent(rToken -> envVars.put("ARGOCD_TOKEN", rToken));
@@ -237,18 +235,41 @@ public abstract class AbstractArgoCD extends Task {
         return new AbstractLogConsumer() {
             @Override
             public void accept(String line, Boolean isStdErr) {
-                if (Boolean.FALSE.equals(isStdErr)) {
-                    builder.append(line).append("\n");
-                } else {
-                    runContext.logger().warn(line);
-                }
+                accept(line, isStdErr, null);
             }
 
             @Override
             public void accept(String line, Boolean isStdErr, Instant timestamp) {
-                accept(line, isStdErr);
+                var trimmed = line.trim();
+
+                // Only ::{}:: control lines go through parseOut, which would log regular stdout such as the ArgoCD JSON.
+                if (trimmed.startsWith("::{") && trimmed.endsWith("}::")) {
+                    this.outputs.putAll(PluginUtilsService.parseOut(trimmed, runContext.logger(), runContext, isStdErr, timestamp));
+                    if (isStdErr) {
+                        this.stdErrCount.incrementAndGet();
+                    } else {
+                        this.stdOutCount.incrementAndGet();
+                    }
+                    return;
+                }
+
+                if (isStdErr) {
+                    this.stdErrCount.incrementAndGet();
+                    runContext.logger().warn(line);
+                } else {
+                    this.stdOutCount.incrementAndGet();
+                    builder.append(line).append("\n");
+                }
             }
         };
+    }
+
+    // beforeCommands may print before the CLI JSON, so start at the first line that begins with '{'.
+    private static final Pattern JSON_START = Pattern.compile("(?m)^[ \\t]*(\\{)");
+
+    protected static String extractJson(String raw) {
+        var matcher = JSON_START.matcher(raw);
+        return matcher.find() ? raw.substring(matcher.end(1) - 1) : raw;
     }
 
     @SuppressWarnings("unchecked")
@@ -275,30 +296,26 @@ public abstract class AbstractArgoCD extends Task {
     }
 
     protected ScriptOutput executeCommands(RunContext runContext, List<String> commands, AbstractLogConsumer logConsumer) throws Exception {
-        List<String> allCommands = new ArrayList<>();
-
+        var allCommands = new ArrayList<>(getBeforeCommandsWithOptions(runContext));
         allCommands.addAll(getInstallCommands(runContext));
         allCommands.addAll(getCertCommands());
         allCommands.addAll(commands);
 
-        String renderedContainerImage = runContext.render(this.containerImage).as(String.class).orElseThrow();
+        var rInterpreter = runContext.render(getInterpreter()).asList(String.class);
 
-        CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
-            .withTaskRunner(this.taskRunner)
-            .withContainerImage(renderedContainerImage)
-            .withEnv(this.getEnvironmentVariables(runContext))
+        return commands(runContext)
+            .withEnv(getEnvironmentVariables(runContext))
             .withEnableOutputDirectory(true)
             .withLogConsumer(logConsumer)
             .withCommands(
                 Property.ofValue(
                     ScriptService.scriptCommands(
-                        List.of("/bin/sh", "-c"),
+                        rInterpreter.isEmpty() ? List.of("/bin/sh", "-c") : rInterpreter,
                         null,
                         allCommands
                     )
                 )
-            );
-
-        return commandsWrapper.run();
+            )
+            .run();
     }
 }
